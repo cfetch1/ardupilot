@@ -1,4 +1,4 @@
-function AP_send(gyro, attitude, accel, velocity, position, time, airspeed)
+function AP_send(gyro, attitude, accel, velocity, position, time)
 global u
 if isempty(u)
    return 
@@ -19,7 +19,6 @@ JSON.imu.accel_body = accel;
 JSON.position = position;
 JSON.attitude = attitude;
 JSON.velocity = velocity;
-JSON.airspeed = airspeed;
 
 % Report to AP
 pnet(u,'printf',sprintf('\n%s\n',jsonencode(JSON)));
