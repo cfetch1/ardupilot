@@ -32,10 +32,6 @@
 #include "bl_protocol.h"
 #include "can.h"
 #include <stdio.h>
-#if EXT_FLASH_SIZE_MB
-#include <AP_FlashIface/AP_FlashIface_JEDEC.h>
-#endif
-#include <AP_CheckFirmware/AP_CheckFirmware.h>
 
 extern "C" {
     int main(void);
@@ -44,8 +40,7 @@ extern "C" {
 struct boardinfo board_info = {
     .board_type = APJ_BOARD_ID,
     .board_rev = 0,
-    .fw_size = (BOARD_FLASH_SIZE - (FLASH_BOOTLOADER_LOAD_KB + FLASH_RESERVE_END_KB + APP_START_OFFSET_KB))*1024,
-    .extf_size = (EXT_FLASH_SIZE_MB * 1024 * 1024) - (EXT_FLASH_RESERVE_START_KB + EXT_FLASH_RESERVE_END_KB) * 1024
+    .fw_size = (BOARD_FLASH_SIZE - (FLASH_BOOTLOADER_LOAD_KB + FLASH_RESERVE_END_KB + APP_START_OFFSET_KB))*1024
 };
 
 #ifndef HAL_BOOTLOADER_TIMEOUT
@@ -54,10 +49,6 @@ struct boardinfo board_info = {
 
 #ifndef HAL_STAY_IN_BOOTLOADER_VALUE
 #define HAL_STAY_IN_BOOTLOADER_VALUE 0
-#endif
-
-#if EXT_FLASH_SIZE_MB
-AP_FlashIface_JEDEC ext_flash;
 #endif
 
 int main(void)
@@ -75,10 +66,6 @@ int main(void)
     mapr &= ~AFIO_MAPR_SWJ_CFG;
     mapr |= AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
     AFIO->MAPR = mapr | AFIO_MAPR_CAN_REMAP_REMAP2 | AFIO_MAPR_SPI3_REMAP;
-#endif
-
-#if HAL_FLASH_PROTECTION
-    stm32_flash_unprotect_flash();
 #endif
 
 #ifndef NO_FASTBOOT
@@ -99,17 +86,11 @@ int main(void)
         timeout = 10000;
         can_set_node_id(m & 0xFF);
     }
-    if (can_check_update()) {
-        // trying to update firmware, stay in bootloader
-        try_boot = false;
-        timeout = 0;
-    }
-    const auto ok = check_good_firmware();
-    if (ok != check_fw_result_t::CHECK_FW_OK) {
+    can_check_update();
+    if (!can_check_firmware()) {
         // bad firmware CRC, don't try and boot
         timeout = 0;
         try_boot = false;
-        led_set(LED_BAD_FW);
     }
 #ifndef BOOTLOADER_DEV_LIST
     else if (timeout != 0) {
@@ -126,16 +107,7 @@ int main(void)
         try_boot = false;
         timeout = 0;
     }
-#elif AP_CHECK_FIRMWARE_ENABLED
-    const auto ok = check_good_firmware();
-    if (ok != check_fw_result_t::CHECK_FW_OK) {
-        // bad firmware, don't try and boot
-        timeout = 0;
-        try_boot = false;
-        led_set(LED_BAD_FW);
-    }
 #endif
-
 #if defined(HAL_GPIO_PIN_VBUS) && defined(HAL_ENABLE_VBUS_CHECK)
 #if HAL_USE_SERIAL_USB == TRUE
     else if (palReadLine(HAL_GPIO_PIN_VBUS) == 0)  {
@@ -169,15 +141,6 @@ int main(void)
     can_start();
 #endif
     flash_init();
-
-
-#if EXT_FLASH_SIZE_MB
-    while (!ext_flash.init()) {
-        // keep trying until we get it working
-        // there's no future without it
-        chThdSleep(chTimeMS2I(20));
-    }
-#endif
 
 #if defined(BOOTLOADER_DEV_LIST)
     while (true) {

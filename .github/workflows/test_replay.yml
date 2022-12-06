@@ -1,27 +1,9 @@
 name: test replay
 
-on: 
-  push:
-    paths-ignore: # ignore vehicle only changes
-      - 'AntennaTracker/**'
-      - 'ArduPlane/**'
-      - 'ArduSub/**'
-      - 'Rover/**'
-      - 'Blimp/**'
-      - 'ArduCopter/**'
-
-  pull_request:
-    paths-ignore: # ignore vehicle only changes
-      - 'AntennaTracker/**'
-      - 'ArduPlane/**'
-      - 'ArduSub/**'
-      - 'Rover/**'
-      - 'Blimp/**'
-      - 'ArduCopter/**'
-
-  workflow_dispatch:
-
-
+on: [push, pull_request, workflow_dispatch]
+# paths:
+# - "*"
+# - "!README.md" <-- don't rebuild on doc change
 concurrency:
   group: ci-${{github.workflow}}-${{ github.ref }}
   cancel-in-progress: true
@@ -59,15 +41,21 @@ jobs:
           restore-keys: ${{github.workflow}}-ccache-${{ matrix.toolchain }}-  # restore ccache from either previous build on this branch or on master
       - name: setup ccache
         run: |
-          . .github/workflows/ccache.env
+          mkdir -p ~/.ccache
+          echo "base_dir = ${GITHUB_WORKSPACE}" > ~/.ccache/ccache.conf
+          echo "compression = true" >> ~/.ccache/ccache.conf
+          echo "compression_level = 6" >> ~/.ccache/ccache.conf
+          echo "max_size = 400M" >> ~/.ccache/ccache.conf
+          ccache -s
+          ccache -z
       - name: test ${{matrix.config}} ${{ matrix.toolchain }}
         env:
           CI_BUILD_TARGET: ${{matrix.config}}
         shell: bash
         run: |
-          if [[ ${{ matrix.toolchain }} == "clang" ]]; then
-            export CC=clang
-            export CXX=clang++
+          if [[ ${{ matrix.toolchain }} = "clang" ]]; then
+            export CC=clang-7
+            export CXX=clang++-7
           fi
           PATH="/github/home/.local/bin:$PATH"
           Tools/scripts/build_ci.sh

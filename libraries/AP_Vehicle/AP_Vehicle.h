@@ -21,16 +21,13 @@
 
 #include "ModeReason.h" // reasons can't be defined in this header due to circular loops
 
-#include <AP_AHRS/AP_AHRS.h>
-#include <AP_Airspeed/AP_Airspeed.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>     // board configuration library
 #include <AP_CANManager/AP_CANManager.h>
 #include <AP_Button/AP_Button.h>
-#include <AP_Compass/AP_Compass.h>
-#include <AP_EFI/AP_EFI.h>
 #include <AP_GPS/AP_GPS.h>
 #include <AP_Generator/AP_Generator.h>
+#include <AP_Logger/AP_Logger.h>
 #include <AP_Notify/AP_Notify.h>                    // Notify library
 #include <AP_Param/AP_Param.h>
 #include <AP_RangeFinder/AP_RangeFinder.h>
@@ -40,7 +37,6 @@
 #include <AP_SerialManager/AP_SerialManager.h>      // Serial manager library
 #include <AP_ServoRelayEvents/AP_ServoRelayEvents.h>
 #include <AP_Camera/AP_RunCam.h>
-#include <AP_OpenDroneID/AP_OpenDroneID.h>
 #include <AP_Hott_Telem/AP_Hott_Telem.h>
 #include <AP_ESC_Telem/AP_ESC_Telem.h>
 #include <AP_GyroFFT/AP_GyroFFT.h>
@@ -50,13 +46,6 @@
 #include <AP_Frsky_Telem/AP_Frsky_Parameters.h>
 #include <AP_ExternalAHRS/AP_ExternalAHRS.h>
 #include <AP_VideoTX/AP_SmartAudio.h>
-#include <AP_VideoTX/AP_Tramp.h>
-#include <AP_TemperatureSensor/AP_TemperatureSensor.h>
-#include <SITL/SITL.h>
-#include <AP_CustomRotations/AP_CustomRotations.h>
-#include <AP_AIS/AP_AIS.h>
-#include <AC_Fence/AC_Fence.h>
-#include <AP_CheckFirmware/AP_CheckFirmware.h>
 
 class AP_Vehicle : public AP_HAL::HAL::Callbacks {
 
@@ -71,7 +60,8 @@ public:
     }
 
     /* Do not allow copies */
-    CLASS_NO_COPY(AP_Vehicle);
+    AP_Vehicle(const AP_Vehicle &other) = delete;
+    AP_Vehicle &operator=(const AP_Vehicle&) = delete;
 
     static AP_Vehicle *get_singleton();
 
@@ -95,11 +85,58 @@ public:
         return control_mode_reason;
     }
 
-    // perform any notifications required to indicate a mode change
-    // failed due to a bad mode number being supplied.  This can
-    // happen for many reasons - bad mavlink packet and bad mode
-    // parameters for example.
-    void notify_no_such_mode(uint8_t mode_number);
+    /*
+      common parameters for fixed wing aircraft
+     */
+    struct FixedWing {
+        AP_Int8 throttle_min;
+        AP_Int8 throttle_max;
+        AP_Int8 throttle_slewrate;
+        AP_Int8 throttle_cruise;
+        AP_Int8 takeoff_throttle_max;
+        AP_Int16 airspeed_min;
+        AP_Int16 airspeed_max;
+        AP_Int32 airspeed_cruise_cm;
+        AP_Int32 min_gndspeed_cm;
+        AP_Int8  crash_detection_enable;
+        AP_Int16 roll_limit_cd;
+        AP_Int16 pitch_limit_max_cd;
+        AP_Int16 pitch_limit_min_cd;
+        AP_Int8  autotune_level;
+        AP_Int8  stall_prevention;
+        AP_Int16 loiter_radius;
+
+        struct Rangefinder_State {
+            bool in_range:1;
+            bool have_initial_reading:1;
+            bool in_use:1;
+            float initial_range;
+            float correction;
+            float initial_correction;
+            float last_stable_correction;
+            uint32_t last_correction_time_ms;
+            uint8_t in_range_count;
+            float height_estimate;
+            float last_distance;
+        };
+
+
+        // stages of flight
+        enum FlightStage {
+            FLIGHT_TAKEOFF       = 1,
+            FLIGHT_VTOL          = 2,
+            FLIGHT_NORMAL        = 3,
+            FLIGHT_LAND          = 4,
+            FLIGHT_ABORT_LAND    = 7
+        };
+    };
+
+    /*
+      common parameters for multicopters
+     */
+    struct MultiCopter {
+        AP_Int16 angle_max;
+    };
 
     void get_common_scheduler_tasks(const AP_Scheduler::Task*& tasks, uint8_t& num_tasks);
     // implementations *MUST* fill in all passed-in fields or we get
@@ -141,7 +178,7 @@ public:
     // returns true if the vehicle has crashed
     virtual bool is_crashed() const;
 
-#if AP_SCRIPTING_ENABLED
+#ifdef ENABLE_SCRIPTING
     /*
       methods to control vehicle for use by scripting
     */
@@ -154,14 +191,8 @@ public:
     virtual bool set_target_velaccel_NED(const Vector3f& target_vel, const Vector3f& target_accel, bool use_yaw, float yaw_deg, bool use_yaw_rate, float yaw_rate_degs, bool yaw_relative) { return false; }
     virtual bool set_target_angle_and_climbrate(float roll_deg, float pitch_deg, float yaw_deg, float climb_rate_ms, bool use_yaw_rate, float yaw_rate_degs) { return false; }
 
-    // command throttle percentage and roll, pitch, yaw target
-    // rates. For use with scripting controllers
-    virtual void set_target_throttle_rate_rpy(float throttle_pct, float roll_rate_dps, float pitch_rate_dps, float yaw_rate_dps) {}
-    virtual bool nav_scripting_enable(uint8_t mode) {return false;}
-
     // get target location (for use by scripting)
     virtual bool get_target_location(Location& target_loc) { return false; }
-    virtual bool update_target_location(const Location &old_loc, const Location &new_loc) { return false; }
 
     // circle mode controls (only used by scripting with Copter)
     virtual bool get_circle_radius(float &radius_m) { return false; }
@@ -169,22 +200,8 @@ public:
 
     // set steering and throttle (-1 to +1) (for use by scripting with Rover)
     virtual bool set_steering_and_throttle(float steering, float throttle) { return false; }
+#endif // ENABLE_SCRIPTING
 
-    // set turn rate in deg/sec and speed in meters/sec (for use by scripting with Rover)
-    virtual bool set_desired_turn_rate_and_speed(float turn_rate, float speed) { return false; }
-
-   // set auto mode speed in meters/sec (for use by scripting with Copter/Rover)
-    virtual bool set_desired_speed(float speed) { return false; }
-
-    // support for NAV_SCRIPT_TIME mission command
-    virtual bool nav_script_time(uint16_t &id, uint8_t &cmd, float &arg1, float &arg2, int16_t &arg3, int16_t &arg4) { return false; }
-    virtual void nav_script_time_done(uint16_t id) {}
-
-    // allow for VTOL velocity matching of a target
-    virtual bool set_velocity_match(const Vector2f &velocity) { return false; }
-
-    // returns true if the EKF failsafe has triggered
-    virtual bool has_ekf_failsafed() const { return false; }
 
     // control outputs enumeration
     enum class ControlOutput {
@@ -203,7 +220,10 @@ public:
     // returns true on success and control_value is set to a value in the range -1 to +1
     virtual bool get_control_output(AP_Vehicle::ControlOutput control_output, float &control_value) { return false; }
 
-#endif // AP_SCRIPTING_ENABLED
+    // write out harmonic notch log messages
+    void write_notch_log_messages() const;
+    // update the harmonic notch
+    virtual void update_dynamic_notch() {};
 
     // zeroing the RC outputs can prevent unwanted motor movement:
     virtual bool should_zero_rc_outputs_on_reboot() const { return false; }
@@ -234,19 +254,6 @@ public:
     AP_Frsky_Parameters frsky_parameters;
 #endif
 
-    /*
-      Returns the pan and tilt for use by onvif camera in scripting
-     */
-    virtual bool get_pan_tilt_norm(float &pan_norm, float &tilt_norm) const { return false; }
-
-   // Returns roll and  pitch for OSD Horizon, Plane overrides to correct for VTOL view and fixed wing TRIM_PITCH_CD
-    virtual void get_osd_roll_pitch_rad(float &roll, float &pitch) const;
-
-    /*
-     get the target body-frame angular velocities in rad/s (Z-axis component used by some gimbals)
-     */
-    virtual bool get_rate_bf_targets(Vector3f& rate_bf_targets) const { return false; }
-
 protected:
 
     virtual void init_ardupilot() = 0;
@@ -262,7 +269,8 @@ protected:
 #endif
 
     // main loop scheduler
-    AP_Scheduler scheduler;
+    AP_Scheduler scheduler{FUNCTOR_BIND_MEMBER(&AP_Vehicle::fast_loop, void)};
+    virtual void fast_loop();
 
     // IMU variables
     // Integration time; time last loop took to run
@@ -273,9 +281,7 @@ protected:
     AP_Baro barometer;
     Compass compass;
     AP_InertialSensor ins;
-#if HAL_BUTTON_ENABLED
     AP_Button button;
-#endif
     RangeFinder rangefinder;
 
     AP_RSSI rssi;
@@ -297,7 +303,11 @@ protected:
     AP_Notify notify;
 
     // Inertial Navigation EKF
-    AP_AHRS ahrs;
+#if AP_AHRS_NAVEKF_AVAILABLE
+    AP_AHRS_NavEKF ahrs;
+#else
+    AP_AHRS_DCM ahrs;
+#endif
 
 #if HAL_HOTT_TELEM_ENABLED
     AP_Hott_Telem hott_telem;
@@ -311,15 +321,11 @@ protected:
     AP_ESC_Telem esc_telem;
 #endif
 
-#if AP_OPENDRONEID_ENABLED
-    AP_OpenDroneID opendroneid;
-#endif
-
 #if HAL_MSP_ENABLED
     AP_MSP msp;
 #endif
 
-#if HAL_GENERATOR_ENABLED
+#if GENERATOR_ENABLED
     AP_Generator generator;
 #endif
 
@@ -331,32 +337,6 @@ protected:
     AP_SmartAudio smartaudio;
 #endif
 
-#if AP_TRAMP_ENABLED
-    AP_Tramp tramp;
-#endif
-
-#if HAL_EFI_ENABLED
-    // EFI Engine Monitor
-    AP_EFI efi;
-#endif
-
-#if AP_AIRSPEED_ENABLED
-    AP_Airspeed airspeed;
-#endif
-
-#if AP_AIS_ENABLED
-    // Automatic Identification System - for tracking sea-going vehicles
-    AP_AIS ais;
-#endif
-
-#if AP_FENCE_ENABLED
-    AC_Fence fence;
-#endif
-
-#if AP_TEMPERATURE_SENSOR_ENABLED
-    AP_TemperatureSensor temperature_sensor;
-#endif
-
     static const struct AP_Param::GroupInfo var_info[];
     static const struct AP_Scheduler::Task scheduler_tasks[];
 
@@ -364,19 +344,7 @@ protected:
     void publish_osd_info();
 #endif
 
-#if HAL_INS_ACCELCAL_ENABLED
-    // update accel calibration
-    void accel_cal_update();
-#endif
-
-    // call the arming library's update function
-    void update_arming();
-
     ModeReason control_mode_reason = ModeReason::UNKNOWN;
-
-#if AP_SIM_ENABLED
-    SITL::SIM sitl;
-#endif
 
 private:
 
@@ -387,31 +355,16 @@ private:
     // statustext:
     void send_watchdog_reset_statustext();
 
-    // update the harmonic notch for throttle based notch
-    void update_throttle_notch(AP_InertialSensor::HarmonicNotch &notch);
-
-    // update the harmonic notch
-    void update_dynamic_notch(AP_InertialSensor::HarmonicNotch &notch);
-
     // run notch update at either loop rate or 200Hz
     void update_dynamic_notch_at_specified_rate();
 
-    // decimation for 1Hz update
-    uint8_t one_Hz_counter;
-    void one_Hz_update();
-
     bool likely_flying;         // true if vehicle is probably flying
     uint32_t _last_flying_ms;   // time when likely_flying last went true
-    uint32_t _last_notch_update_ms[HAL_INS_NUM_HARMONIC_NOTCH_FILTERS]; // last time update_dynamic_notch() was run
+    uint32_t _last_notch_update_ms; // last time update_dynamic_notch() was run
 
     static AP_Vehicle *_singleton;
 
     bool done_safety_init;
-
-
-    uint32_t _last_internal_errors;  // backup of AP_InternalError::internal_errors bitmask
-
-    AP_CustomRotations custom_rotations;
 };
 
 namespace AP {

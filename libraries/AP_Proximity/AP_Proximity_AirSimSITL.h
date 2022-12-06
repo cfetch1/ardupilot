@@ -40,7 +40,7 @@ public:
     bool get_upward_distance(float &distance) const override;
 
 private:
-    SITL::SIM *sitl = AP::sitl();
+    SITL::SITL *sitl = AP::sitl();
     AP_Proximity_Temp_Boundary temp_boundary;
 
 };

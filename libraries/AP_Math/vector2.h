@@ -89,11 +89,6 @@ struct Vector2
     // dot product
     T operator *(const Vector2<T> &v) const;
 
-    // dot product (same as above but a more easily understood name)
-    T dot(const Vector2<T> &v) const {
-        return *this * v;
-    }
-
     // cross product
     T operator %(const Vector2<T> &v) const;
 
@@ -113,7 +108,7 @@ struct Vector2
 
     // check if all elements are zero
     bool is_zero(void) const WARN_IF_UNUSED {
-        return x == 0 && y == 0;
+        return (fabsf(x) < FLT_EPSILON) && (fabsf(y) < FLT_EPSILON);
     }
 
     // allow a vector2 to be used as an array, 0 indexed
@@ -247,14 +242,14 @@ struct Vector2
         const T expected_run = seg_end.x-seg_start.x;
         const T intersection_run = point.x-seg_start.x;
         // check slopes are identical:
-        if (::is_zero(expected_run)) {
-            if (fabsF(intersection_run) > FLT_EPSILON) {
+        if (fabsf(expected_run) < FLT_EPSILON) {
+            if (fabsf(intersection_run) > FLT_EPSILON) {
                 return false;
             }
         } else {
             const T expected_slope = (seg_end.y-seg_start.y)/expected_run;
             const T intersection_slope = (point.y-seg_start.y)/intersection_run;
-            if (fabsF(expected_slope - intersection_slope) > FLT_EPSILON) {
+            if (fabsf(expected_slope - intersection_slope) > FLT_EPSILON) {
                 return false;
             }
         }
@@ -280,15 +275,6 @@ struct Vector2
         return true;
     }
 };
-
-// check if all elements are zero
-template<> inline bool Vector2<float>::is_zero(void) const {
-    return ::is_zero(x) && ::is_zero(y);
-}
-
-template<> inline bool Vector2<double>::is_zero(void) const {
-    return ::is_zero(x) && ::is_zero(y);
-}
 
 typedef Vector2<int16_t>        Vector2i;
 typedef Vector2<uint16_t>       Vector2ui;

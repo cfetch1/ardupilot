@@ -25,9 +25,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Math/AP_Math.h>
-#include <AC_PID/AC_PID.h>
-#include <AP_Scheduler/AP_Scheduler.h>
-#include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -47,7 +44,7 @@ extern const AP_HAL::HAL& hal;
 
 // constructor
 AP_AutoTune::AP_AutoTune(ATGains &_gains, ATType _type,
-                         const AP_FixedWing &parms,
+                         const AP_Vehicle::FixedWing &parms,
                          AC_PID &_rpid) :
     current(_gains),
     rpid(_rpid),
@@ -60,7 +57,7 @@ AP_AutoTune::AP_AutoTune(ATGains &_gains, ATType _type,
 #include <stdio.h>
 # define Debug(fmt, args ...)  do {::printf("%s:%d: " fmt "\n", __FUNCTION__, __LINE__, ## args); } while(0)
 #else
-# define Debug(fmt, args ...)
+ # define Debug(fmt, args ...)
 #endif
 
 /*
@@ -150,23 +147,10 @@ void AP_AutoTune::stop(void)
     }
 }
 
-const char *AP_AutoTune::axis_string(void) const
-{
-    switch (type) {
-    case AUTOTUNE_ROLL:
-        return "Roll";
-    case AUTOTUNE_PITCH:
-        return "Pitch";
-    case AUTOTUNE_YAW:
-        return "Yaw";
-    }
-    return "";
-}
-
 /*
   one update cycle of the autotuner
  */
-void AP_AutoTune::update(AP_PIDInfo &pinfo, float scaler, float angle_err_deg)
+void AP_AutoTune::update(AP_Logger::PID_Info &pinfo, float scaler, float angle_err_deg)
 {
     if (!running) {
         return;
@@ -205,23 +189,15 @@ void AP_AutoTune::update(AP_PIDInfo &pinfo, float scaler, float angle_err_deg)
     max_SRate_P = MAX(max_SRate_P, slew_limiter_P.get_slew_rate());
     max_SRate_D = MAX(max_SRate_D, slew_limiter_D.get_slew_rate());
 
-    float att_limit_deg = 0;
-    switch (type) {
-    case AUTOTUNE_ROLL:
+    float att_limit_deg;
+    if (type == AUTOTUNE_ROLL) {
         att_limit_deg = aparm.roll_limit_cd * 0.01;
-        break;
-    case AUTOTUNE_PITCH:
+    } else {
         att_limit_deg = MIN(abs(aparm.pitch_limit_max_cd),abs(aparm.pitch_limit_min_cd))*0.01;
-        break;
-    case AUTOTUNE_YAW:
-        // arbitrary value for yaw angle
-        att_limit_deg = 20;
-        break;
     }
 
-
     // thresholds for when we consider an event to start and end
-    const float rate_threshold1 = 0.4 * MIN(att_limit_deg / current.tau.get(), current.rmax_pos);
+    const float rate_threshold1 = 0.6 * MIN(att_limit_deg / current.tau.get(), current.rmax_pos);
     const float rate_threshold2 = 0.25 * rate_threshold1;
     bool in_att_demand = fabsf(angle_err_deg) >= 0.3 * att_limit_deg;
 
@@ -361,7 +337,7 @@ void AP_AutoTune::update(AP_PIDInfo &pinfo, float scaler, float angle_err_deg)
             D_limit = D;
             D_set_ms = now;
             action = Action::LOWER_D;
-            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "%sD: %.4f", axis_string(), D_limit);
+            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "%sD: %.4f", type==AUTOTUNE_ROLL?"Roll":"Pitch", D_limit);            
         }
     } else if (min_Dmod < 1.0) {
         // oscillation, with D_limit set
@@ -373,28 +349,20 @@ void AP_AutoTune::update(AP_PIDInfo &pinfo, float scaler, float angle_err_deg)
                 D_limit = D;
                 D_set_ms = now;
                 action = Action::LOWER_D;
-                GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "%sD: %.4f", axis_string(), D_limit);
+                GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "%sD: %.4f", type==AUTOTUNE_ROLL?"Roll":"Pitch", D_limit);
                 done_count = 0;
-            } else if (now - P_set_ms > 2500) {
-                if (is_positive(P_limit)) {
-                    // if we've already got a P estimate then don't
-                    // reduce as quickly, stopping small spikes at the
-                    // later part of the tune from giving us a very
-                    // low P gain
-                    P *= 0.7;
-                } else {
-                    P *= 0.35;
-                }
+            } else if (now - P_set_ms > 2000) {
+                P *= 0.35;
                 P_limit = P;
                 P_set_ms = now;
                 action = Action::LOWER_P;
                 done_count = 0;
-                GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "%sP: %.4f", axis_string(), P_limit);
+                GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "%sP: %.4f", type==AUTOTUNE_ROLL?"Roll":"Pitch", P_limit);
             }
         }
     } else if (ff_count < 4) {
         // we don't have a good FF estimate yet, keep going
-
+        
     } else if (!is_positive(D_limit)) {
         /* we haven't detected D oscillation yet, keep raising D */
         D *= 1.3;
@@ -408,7 +376,7 @@ void AP_AutoTune::update(AP_PIDInfo &pinfo, float scaler, float angle_err_deg)
         // have done 3 cycles without reducing P
         if (done_count < 3) {
             if (++done_count == 3) {
-                GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "%s: Finished", axis_string());
+                GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "%s: Finished", type==AUTOTUNE_ROLL?"Roll":"Pitch");
                 save_gains();
             }
         }
@@ -417,11 +385,7 @@ void AP_AutoTune::update(AP_PIDInfo &pinfo, float scaler, float angle_err_deg)
     rpid.ff().set(FF);
     rpid.kP().set(P);
     rpid.kD().set(D);
-    if (type == AUTOTUNE_ROLL) {  // for roll set I = smaller of FF or P
-        rpid.kI().set(MIN(P, (FF / TRIM_TCONST)));
-    } else {                      // for pitch/yaw naturally damped axes) set I usually = FF to get 1 sec I closure
-        rpid.kI().set(MAX(P*AUTOTUNE_I_RATIO, (FF / TRIM_TCONST)));
-    }
+    rpid.kI().set(MAX(P*AUTOTUNE_I_RATIO, (FF / TRIM_TCONST)));
 
     // setup filters to be suitable for time constant and gyro filter
     rpid.filt_T_hz().set(10.0/(current.tau * 2 * M_PI));

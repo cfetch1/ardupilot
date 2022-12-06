@@ -17,10 +17,12 @@
 
 #include "RPM_EFI.h"
 
-#if AP_RPM_EFI_ENABLED
+#if HAL_EFI_ENABLED
+extern const AP_HAL::HAL& hal;
 
-#include <AP_EFI/AP_EFI.h>
-
+/* 
+   open the sensor in constructor
+*/
 AP_RPM_EFI::AP_RPM_EFI(AP_RPM &_ap_rpm, uint8_t _instance, AP_RPM::RPM_State &_state) :
     AP_RPM_Backend(_ap_rpm, _instance, _state)
 {
@@ -34,9 +36,9 @@ void AP_RPM_EFI::update(void)
         return;
     }
     state.rate_rpm = efi->get_rpm();
-    state.rate_rpm *= ap_rpm._params[state.instance].scaling;
+    state.rate_rpm *= ap_rpm._scaling[state.instance];
     state.signal_quality = 0.5f;
     state.last_reading_ms = AP_HAL::millis();
 }
 
-#endif // AP_RPM_EFI_ENABLED
+#endif // HAL_EFI_ENABLED

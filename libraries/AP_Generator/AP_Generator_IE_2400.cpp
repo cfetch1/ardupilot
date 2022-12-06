@@ -15,7 +15,7 @@
 
 #include "AP_Generator_IE_2400.h"
 
-#if HAL_GENERATOR_ENABLED
+#if GENERATOR_ENABLED
 
 #include <AP_Logger/AP_Logger.h>
 
@@ -77,12 +77,12 @@ void AP_Generator_IE_2400::decode_latest_term()
     switch (_term_number) {
         case 1:
             // Float
-            _parsed.tank_bar = strtof(_term, NULL);
+            _parsed.tank_bar = atof(_term);
             break;
 
         case 2:
             // Float
-            _parsed.battery_volt = strtof(_term, NULL);
+            _parsed.battery_volt = atof(_term);
             break;
 
         case 3:
@@ -190,7 +190,7 @@ void AP_Generator_IE_2400::log_write()
         return;
     }
 
-    AP::logger().WriteStreaming(
+    AP::logger().Write(
         "IE24",
         "TimeUS,FUEL,SPMPWR,POUT,ERR",
         "s%WW-",

@@ -1,5 +1,21 @@
 #include "Blimp.h"
 
+
+// performs pre-arm checks. expects to be called at 1hz.
+void AP_Arming_Blimp::update(void)
+{
+    // perform pre-arm checks & display failures every 30 seconds
+    static uint8_t pre_arm_display_counter = PREARM_DISPLAY_PERIOD/2;
+    pre_arm_display_counter++;
+    bool display_fail = false;
+    if (pre_arm_display_counter >= PREARM_DISPLAY_PERIOD) {
+        display_fail = true;
+        pre_arm_display_counter = 0;
+    }
+
+    pre_arm_checks(display_fail);
+}
+
 bool AP_Arming_Blimp::pre_arm_checks(bool display_failure)
 {
     const bool passed = run_pre_arm_checks(display_failure);
@@ -24,6 +40,14 @@ bool AP_Arming_Blimp::run_pre_arm_checks(bool display_failure)
         return false;
     }
 
+    // check if motor interlock aux switch is in use
+    // if it is, switch needs to be in disabled position to arm
+    // otherwise exit immediately.  This check to be repeated,
+    // as state can change at any time.
+    if (blimp.ap.using_interlock && blimp.ap.motor_interlock_switch) {
+        check_failed(display_failure, "Motor Interlock Enabled");
+    }
+
     // if pre arm checks are disabled run only the mandatory checks
     if (checks_to_perform == 0) {
         return mandatory_checks(display_failure);
@@ -32,6 +56,7 @@ bool AP_Arming_Blimp::run_pre_arm_checks(bool display_failure)
     return fence_checks(display_failure)
            & parameter_checks(display_failure)
            & motor_checks(display_failure)
+           & pilot_throttle_checks(display_failure)
            & gcs_failsafe_check(display_failure)
            & alt_checks(display_failure)
            & AP_Arming::pre_arm_checks(display_failure);
@@ -52,12 +77,29 @@ bool AP_Arming_Blimp::barometer_checks(bool display_failure)
         nav_filter_status filt_status = blimp.inertial_nav.get_filter_status();
         bool using_baro_ref = (!filt_status.flags.pred_horiz_pos_rel && filt_status.flags.pred_horiz_pos_abs);
         if (using_baro_ref) {
-            if (fabsf(blimp.inertial_nav.get_position_z_up_cm() - blimp.baro_alt) > PREARM_MAX_ALT_DISPARITY_CM) {
+            if (fabsf(blimp.inertial_nav.get_altitude() - blimp.baro_alt) > PREARM_MAX_ALT_DISPARITY_CM) {
                 check_failed(ARMING_CHECK_BARO, display_failure, "Altitude disparity");
                 ret = false;
             }
         }
     }
+    return ret;
+}
+
+bool AP_Arming_Blimp::compass_checks(bool display_failure)
+{
+    bool ret = AP_Arming::compass_checks(display_failure);
+
+    if ((checks_to_perform == ARMING_CHECK_ALL) || (checks_to_perform & ARMING_CHECK_COMPASS)) {
+        // check compass offsets have been set.  AP_Arming only checks
+        // this if learning is off; Blimp *always* checks.
+        char failure_msg[50] = {};
+        if (!AP::compass().configured(failure_msg, ARRAY_SIZE(failure_msg))) {
+            check_failed(ARMING_CHECK_COMPASS, display_failure, "%s", failure_msg);
+            ret = false;
+        }
+    }
+
     return ret;
 }
 
@@ -112,6 +154,22 @@ bool AP_Arming_Blimp::parameter_checks(bool display_failure)
                 return false;
             }
         }
+        if (blimp.g.failsafe_gcs == FS_GCS_ENABLED_CONTINUE_MISSION) {
+            // FS_GCS_ENABLE == 2 has been removed
+            check_failed(ARMING_CHECK_PARAMETERS, display_failure, "FS_GCS_ENABLE=2 removed, see FS_OPTIONS");
+        }
+
+        // lean angle parameter check
+        if (blimp.aparm.angle_max < 1000 || blimp.aparm.angle_max > 8000) {
+            check_failed(ARMING_CHECK_PARAMETERS, display_failure, "Check ANGLE_MAX");
+            return false;
+        }
+
+        // pilot-speed-up parameter check
+        if (blimp.g.pilot_speed_up <= 0) {
+            check_failed(ARMING_CHECK_PARAMETERS, display_failure, "Check PILOT_SPEED_UP");
+            return false;
+        }
     }
 
     return true;
@@ -129,6 +187,21 @@ bool AP_Arming_Blimp::motor_checks(bool display_failure)
     // further checks enabled with parameters
     if (!check_enabled(ARMING_CHECK_PARAMETERS)) {
         return true;
+    }
+
+    return true;
+}
+
+bool AP_Arming_Blimp::pilot_throttle_checks(bool display_failure)
+{
+    // check throttle is above failsafe throttle
+    // this is near the bottom to allow other failures to be displayed before checking pilot throttle
+    if ((checks_to_perform == ARMING_CHECK_ALL) || (checks_to_perform & ARMING_CHECK_RC)) {
+        if (blimp.g.failsafe_throttle != FS_THR_DISABLED && blimp.channel_down->get_radio_in() < blimp.g.failsafe_throttle_value) {
+            const char *failmsg = "Throttle below Failsafe";
+            check_failed(ARMING_CHECK_RC, display_failure, "%s", failmsg);
+            return false;
+        }
     }
 
     return true;
@@ -195,7 +268,7 @@ bool AP_Arming_Blimp::pre_arm_ekf_attitude_check()
 bool AP_Arming_Blimp::mandatory_gps_checks(bool display_failure)
 {
     // always check if inertial nav has started and is ready
-    const auto &ahrs = AP::ahrs();
+    const AP_AHRS_NavEKF &ahrs = AP::ahrs_navekf();
     char failure_msg[50] = {};
     if (!ahrs.pre_arm_check(false, failure_msg, sizeof(failure_msg))) {
         check_failed(display_failure, "AHRS: %s", failure_msg);
@@ -214,15 +287,6 @@ bool AP_Arming_Blimp::mandatory_gps_checks(bool display_failure)
     } else  {
         // return true if GPS is not required
         return true;
-    }
-
-    // check for GPS glitch (as reported by EKF)
-    nav_filter_status filt_status;
-    if (ahrs.get_filter_status(filt_status)) {
-        if (filt_status.flags.gps_glitching) {
-            check_failed(display_failure, "GPS glitching");
-            return false;
-        }
     }
 
     // if we got here all must be ok
@@ -271,7 +335,7 @@ bool AP_Arming_Blimp::mandatory_checks(bool display_failure)
         result = false;
     }
 
-    return result & AP_Arming::mandatory_checks(display_failure);
+    return result;
 }
 
 void AP_Arming_Blimp::set_pre_arm_check(bool b)
@@ -314,7 +378,7 @@ bool AP_Arming_Blimp::arm(const AP_Arming::Method method, const bool do_arming_c
 
     gcs().send_text(MAV_SEVERITY_INFO, "Arming motors"); //MIR kept in - usually only in SITL
 
-    auto &ahrs = AP::ahrs();
+    AP_AHRS_NavEKF &ahrs = AP::ahrs_navekf();
 
     blimp.initial_armed_bearing = ahrs.yaw_sensor;
 
@@ -332,9 +396,11 @@ bool AP_Arming_Blimp::arm(const AP_Arming::Method method, const bool do_arming_c
         }
 
         // remember the height when we armed
-        blimp.arming_altitude_m = blimp.inertial_nav.get_position_z_up_cm() * 0.01;
+        blimp.arming_altitude_m = blimp.inertial_nav.get_altitude() * 0.01;
     }
 
+    // enable gps velocity based centrefugal force compensation
+    ahrs.set_correct_centrifugal(true);
     hal.util->set_soft_armed(true);
 
     // finally actually arm the motors
@@ -374,7 +440,7 @@ bool AP_Arming_Blimp::disarm(const AP_Arming::Method method, bool do_disarm_chec
     gcs().send_text(MAV_SEVERITY_INFO, "Disarming motors"); //MIR keeping in - usually only in SITL
 
 
-    auto &ahrs = AP::ahrs();
+    AP_AHRS_NavEKF &ahrs = AP::ahrs_navekf();
 
     // save compass offsets learned by the EKF if enabled
     Compass &compass = AP::compass();
@@ -392,6 +458,8 @@ bool AP_Arming_Blimp::disarm(const AP_Arming::Method method, bool do_disarm_chec
 
     AP::logger().set_vehicle_armed(false);
 
+    // disable gps velocity based centrefugal force compensation
+    ahrs.set_correct_centrifugal(false);
     hal.util->set_soft_armed(false);
 
     blimp.ap.in_arming_delay = false;

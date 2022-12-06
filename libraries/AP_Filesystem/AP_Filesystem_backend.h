@@ -20,9 +20,7 @@
 #include <stdint.h>
 #include <AP_HAL/AP_HAL_Boards.h>
 
-#include "AP_Filesystem_config.h"
-
-#include <AP_InternalError/AP_InternalError.h>
+#include "AP_Filesystem_Available.h"
 
 // returned structure from a load_file() call
 class FileData {
@@ -43,7 +41,7 @@ class AP_Filesystem_Backend {
 
 public:
     // functions that closely match the equivalent posix calls
-    virtual int open(const char *fname, int flags, bool allow_absolute_paths = false) {
+    virtual int open(const char *fname, int flags) {
         return -1;
     }
     virtual int close(int fd) { return -1; }
@@ -73,9 +71,6 @@ public:
     // unmount filesystem for reboot
     virtual void unmount(void) {}
 
-    // format sdcard
-    virtual bool format(void) { return false; }
-    
     /*
       load a full file. Use delete to free the data
      */
@@ -89,9 +84,4 @@ protected:
     bool file_op_allowed(void) const;
 };
 
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-#define FS_CHECK_ALLOWED(retfail) do { if (!file_op_allowed()) { INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control); return retfail; } } while(0)
-#else
 #define FS_CHECK_ALLOWED(retfail) do { if (!file_op_allowed()) { return retfail; } } while(0)
-#endif

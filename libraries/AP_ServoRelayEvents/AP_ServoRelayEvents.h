@@ -18,7 +18,8 @@ public:
     }
 
     /* Do not allow copies */
-    CLASS_NO_COPY(AP_ServoRelayEvents);
+    AP_ServoRelayEvents(const AP_ServoRelayEvents &other) = delete;
+    AP_ServoRelayEvents &operator=(const AP_ServoRelayEvents&) = delete;
 
     // get singleton instance
     static AP_ServoRelayEvents *get_singleton() {

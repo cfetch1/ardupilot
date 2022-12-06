@@ -30,6 +30,7 @@
 #include <stdio.h>
 
 #include <AP_Math/AP_Math.h>
+#include <AP_HAL/AP_HAL.h>
 #include <AP_HAL/utility/sparse-endian.h>
 
 #include "AP_Compass_HMC5843.h"
@@ -152,7 +153,7 @@ bool AP_Compass_HMC5843::init()
     AP_HAL::Semaphore *bus_sem = _bus->get_semaphore();
 
     if (!bus_sem) {
-        DEV_PRINTF("HMC5843: Unable to get bus semaphore\n");
+        hal.console->printf("HMC5843: Unable to get bus semaphore\n");
         return false;
     }
     bus_sem->take_blocking();
@@ -161,7 +162,7 @@ bool AP_Compass_HMC5843::init()
     _bus->set_retries(10);
     
     if (!_bus->configure()) {
-        DEV_PRINTF("HMC5843: Could not configure the bus\n");
+        hal.console->printf("HMC5843: Could not configure the bus\n");
         goto errout;
     }
 
@@ -170,7 +171,7 @@ bool AP_Compass_HMC5843::init()
     }
 
     if (!_calibrate()) {
-        DEV_PRINTF("HMC5843: Could not calibrate sensor\n");
+        hal.console->printf("HMC5843: Could not calibrate sensor\n");
         goto errout;
     }
 
@@ -179,7 +180,7 @@ bool AP_Compass_HMC5843::init()
     }
 
     if (!_bus->start_measurements()) {
-        DEV_PRINTF("HMC5843: Could not start measurements on bus\n");
+        hal.console->printf("HMC5843: Could not start measurements on bus\n");
         goto errout;
     }
 
@@ -210,7 +211,7 @@ bool AP_Compass_HMC5843::init()
     _bus->register_periodic_callback(13333,
                                      FUNCTOR_BIND_MEMBER(&AP_Compass_HMC5843::_timer, void));
 
-    DEV_PRINTF("HMC5843 found on bus 0x%x\n", (unsigned)_bus->get_bus_id());
+    hal.console->printf("HMC5843 found on bus 0x%x\n", (unsigned)_bus->get_bus_id());
     
     return true;
 
@@ -497,14 +498,12 @@ AP_HMC5843_BusDriver_Auxiliary::AP_HMC5843_BusDriver_Auxiliary(AP_InertialSensor
      * Only initialize members. Fails are handled by configure or while
      * getting the semaphore
      */
-#if HAL_INS_ENABLED
     _bus = ins.get_auxiliary_bus(backend_id);
     if (!_bus) {
         return;
     }
 
     _slave = _bus->request_next_slave(addr);
-#endif
 }
 
 AP_HMC5843_BusDriver_Auxiliary::~AP_HMC5843_BusDriver_Auxiliary()

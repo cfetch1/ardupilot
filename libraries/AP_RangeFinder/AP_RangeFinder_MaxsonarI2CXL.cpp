@@ -23,8 +23,6 @@
  */
 #include "AP_RangeFinder_MaxsonarI2CXL.h"
 
-#if AP_RANGEFINDER_MAXSONARI2CXL_ENABLED
-
 #include <utility>
 
 #include <AP_HAL/AP_HAL.h>
@@ -145,7 +143,7 @@ void AP_RangeFinder_MaxsonarI2CXL::update(void)
 {
     WITH_SEMAPHORE(_sem);
     if (new_distance) {
-        state.distance_m = distance * 0.01f;
+        state.distance_cm = distance;
         new_distance = false;
         update_status();
     } else if (AP_HAL::millis() - state.last_reading_ms > 300) {
@@ -153,5 +151,3 @@ void AP_RangeFinder_MaxsonarI2CXL::update(void)
         set_status(RangeFinder::Status::NoData);
     }
 }
-
-#endif  // AP_RANGEFINDER_MAXSONARI2CXL_ENABLED

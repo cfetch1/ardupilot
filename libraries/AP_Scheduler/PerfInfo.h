@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stdint.h>
-#include <AP_Common/ExpandingString.h>
 
 namespace AP {
 
@@ -17,13 +16,11 @@ public:
         uint32_t tick_count;
         uint16_t slip_count;
         uint16_t overrun_count;
-
-        void update(uint16_t task_time_us, bool overrun);
-        void print(const char* task_name, uint32_t total_time, ExpandingString& str) const;
     };
 
     /* Do not allow copies */
-    CLASS_NO_COPY(PerfInfo);
+    PerfInfo(const PerfInfo &other) = delete;
+    PerfInfo &operator=(const PerfInfo&) = delete;
 
     void reset();
     void ignore_this_loop();
@@ -46,13 +43,13 @@ public:
     bool has_task_info() { return _task_info != nullptr; }
     // return a task info
     const TaskInfo* get_task_info(uint8_t task_index) const {
-        return (_task_info && task_index < _num_tasks) ? &_task_info[task_index] : nullptr;
+        return (_task_info && task_index <= _num_tasks) ? &_task_info[task_index] : nullptr;
     }
     // called after each run of a task to update its statistics based on measurements taken by the scheduler
     void update_task_info(uint8_t task_index, uint16_t task_time_us, bool overrun);
     // record that a task slipped
     void task_slipped(uint8_t task_index) {
-        if (_task_info && task_index < _num_tasks) {
+        if (_task_info && task_index <= _num_tasks) {
             _task_info[task_index].overrun_count++;
         }
     }

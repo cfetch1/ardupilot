@@ -1,7 +1,5 @@
 #include "AP_Baro_Backend.h"
-
 #include <stdio.h>
-#include <AP_Math/AP_Math.h>
 
 extern const AP_HAL::HAL& hal;
 

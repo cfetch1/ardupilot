@@ -35,10 +35,10 @@ float ADCSource::read_latest() {
         return _sitlState->sonar_pin_value;
 
     case 1:
-        return _sitlState->airspeed_pin_value[0];
+        return _sitlState->airspeed_pin_value;
     
     case 2:
-        return _sitlState->airspeed_pin_value[1];
+        return _sitlState->airspeed_2_pin_value;
 
     case 12:
         return _sitlState->current_pin_value;
@@ -58,9 +58,8 @@ float ADCSource::read_latest() {
     }
 }
 
-bool ADCSource::set_pin(uint8_t pin) {
+void ADCSource::set_pin(uint8_t pin) {
     _pin = pin;
-    return true;
 }
 
 void AnalogIn::init() {

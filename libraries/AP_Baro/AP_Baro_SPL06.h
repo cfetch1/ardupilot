@@ -1,12 +1,10 @@
 #pragma once
 
-#include "AP_Baro_Backend.h"
-
-#if AP_BARO_SPL06_ENABLED
-
 #include <AP_HAL/AP_HAL.h>
 #include <AP_HAL/Device.h>
 #include <AP_HAL/utility/OwnPtr.h>
+
+#include "AP_Baro_Backend.h"
 
 #ifndef HAL_BARO_SPL06_I2C_ADDR
  #define HAL_BARO_SPL06_I2C_ADDR  (0x76)
@@ -47,5 +45,3 @@ private:
     int32_t _c00, _c10;
     int16_t _c0, _c1, _c01, _c11, _c20, _c21, _c30;
 };
-
-#endif  // AP_BARO_SPL06_ENABLED

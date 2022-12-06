@@ -49,13 +49,3 @@ uint8_t AP_Airspeed_Backend::get_bus(void) const
 {
     return frontend.param[instance].bus;
 }
-
-bool AP_Airspeed_Backend::bus_is_confgured(void) const
-{
-    return frontend.param[instance].bus.configured();
-}
-
-void AP_Airspeed_Backend::set_bus_id(uint32_t id)
-{
-    frontend.param[instance].bus_id.set_and_save(int32_t(id));
-}

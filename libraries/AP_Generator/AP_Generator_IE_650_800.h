@@ -2,7 +2,7 @@
 
 #include "AP_Generator_IE_FuelCell.h"
 
-#if HAL_GENERATOR_ENABLED
+#if GENERATOR_ENABLED
 
 class AP_Generator_IE_650_800 : public AP_Generator_IE_FuelCell
 {

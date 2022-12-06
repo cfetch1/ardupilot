@@ -32,13 +32,17 @@ Sub::Sub()
           auto_yaw_mode(AUTO_YAW_LOOK_AT_NEXT_WP),
           inertial_nav(ahrs),
           ahrs_view(ahrs, ROTATION_NONE),
-          attitude_control(ahrs_view, aparm, motors, scheduler.get_loop_period_s()),
-          pos_control(ahrs_view, inertial_nav, motors, attitude_control, scheduler.get_loop_period_s()),
+          attitude_control(ahrs_view, aparm, motors, MAIN_LOOP_SECONDS),
+          pos_control(ahrs_view, inertial_nav, motors, attitude_control, MAIN_LOOP_SECONDS),
           wp_nav(inertial_nav, ahrs_view, pos_control, attitude_control),
           loiter_nav(inertial_nav, ahrs_view, pos_control, attitude_control),
           circle_nav(inertial_nav, ahrs_view, pos_control),
           param_loader(var_info)
 {
+    // init sensor error logging flags
+    sensor_health.baro = true;
+    sensor_health.compass = true;
+
 #if CONFIG_HAL_BOARD != HAL_BOARD_SITL
     failsafe.pilot_input = true;
 #endif

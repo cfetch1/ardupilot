@@ -15,7 +15,8 @@ public:
     }
 
     /* Do not allow copies */
-    CLASS_NO_COPY(AP_Arming_Plane);
+    AP_Arming_Plane(const AP_Arming_Plane &other) = delete;
+    AP_Arming_Plane &operator=(const AP_Arming_Plane&) = delete;
 
     bool pre_arm_checks(bool report) override;
     bool arm_checks(AP_Arming::Method method) override;
@@ -31,10 +32,6 @@ public:
 
 protected:
     bool ins_checks(bool report) override;
-    bool terrain_database_required() const override;
-
-    bool quadplane_checks(bool display_failure);
-    bool mission_checks(bool report) override;
 
 private:
     void change_arm_state(void);

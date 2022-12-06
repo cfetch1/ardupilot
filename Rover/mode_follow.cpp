@@ -1,3 +1,4 @@
+#include "mode.h"
 #include "Rover.h"
 
 // initialize follow mode

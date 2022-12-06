@@ -3,10 +3,7 @@
 set -e
 set -x
 
-if [ "x$BUILDLOGS" = "x" ]; then
-    BUILDLOGS="../buildlogs"
-fi
-PARAMS_DIR="$BUILDLOGS/Parameters"
+PARAMS_DIR="../buildlogs/Parameters"
 
 # work from either APM directory or above
 [ -d ArduPlane ] || cd APM
@@ -28,16 +25,6 @@ generate_parameters() {
     if [ -e "Parameters.rst" ]; then
 	/bin/cp Parameters.rst "$VEHICLE_PARAMS_DIR/"
     fi
-    if [ -e "ParametersLatex.rst" ]; then
-    /bin/cp ParametersLatex.rst "$VEHICLE_PARAMS_DIR/"
-    fi
-    F="apm.pdef.json"
-    if [ -e "$F" ]; then
-	    /bin/cp "$F" "$VEHICLE_PARAMS_DIR/"
-        pushd "$VEHICLE_PARAMS_DIR"
-          xz -e <"$F" >"$F.xz.new" && mv "$F.xz.new" "$F.xz"
-        popd
-    fi
 }
 
 generate_sitl_parameters() {
@@ -55,9 +42,6 @@ generate_sitl_parameters() {
     if [ -e "Parameters.rst" ]; then
 	/bin/cp Parameters.rst "$VEHICLE_PARAMS_DIR/"
     fi
-    if [ -e "ParametersLatex.rst" ]; then
-    /bin/cp ParametersLatex.rst "$VEHICLE_PARAMS_DIR/"
-    fi
 }
 
 generate_parameters ArduPlane
@@ -71,7 +55,5 @@ generate_parameters ArduSub
 generate_parameters AntennaTracker
 
 generate_parameters AP_Periph
-
-generate_parameters Blimp
 
 generate_sitl_parameters

@@ -65,7 +65,7 @@ import traceback
 def get_exception_stacktrace(e):
     if sys.version_info[0] >= 3:
         ret = "%s\n" % e
-        ret += ''.join(traceback.format_exception(type(e),
+        ret += ''.join(traceback.format_exception(etype=type(e),
                                                   value=e,
                                                   tb=e.__traceback__))
         return ret
@@ -124,8 +124,8 @@ class Bisect(object):
         while True:
             x = p.stdout.readline()
             if len(x) == 0:
-                waitpid_result = os.waitpid(p.pid, 0)
-                if waitpid_result:
+                returncode = os.waitpid(p.pid, 0)
+                if returncode:
                     break
                     # select not available on Windows... probably...
                 time.sleep(0.1)
@@ -135,12 +135,12 @@ class Bisect(object):
             self.program_output += x
             x = x.rstrip()
             print("%s: %s" % (prefix, x))
-        (pid, status) = waitpid_result
+        (_, status) = returncode
         if status != 0:
             self.progress("Process failed (%s)" %
-                          str(waitpid_result))
+                          str(returncode))
             raise subprocess.CalledProcessError(
-                status, cmd_list)
+                returncode, cmd_list)
 
     def build(self):
         '''run ArduCopter build.  May exit with skip or fail'''
@@ -170,13 +170,6 @@ class Bisect(object):
             else:
                 self.exit_fail()
 
-    def update_submodules(self):
-        try:
-            self.run_program("Update submodules",
-                             ["git", "submodule", "update", "--init", "--recursive"])
-        except subprocess.CalledProcessError:
-            self.exit_abort()
-
 
 class BisectBuild(Bisect):
 
@@ -184,7 +177,6 @@ class BisectBuild(Bisect):
         super(BisectBuild, self).__init__(opts)
 
     def run(self):
-        self.update_submodules()
         self.build()  # may exit with skip or fail
         self.exit_pass()
 
@@ -219,7 +211,11 @@ class BisectCITest(Bisect):
         if self.opts.autotest_branch is None:
             raise ValueError("expected autotest branch")
 
-        self.update_submodules()
+        try:
+            self.run_program("Update submodules",
+                             ["git", "submodule", "update", "--init", "--recursive"])
+        except subprocess.CalledProcessError:
+            self.exit_abort()
 
         try:
             self.run_program("Check autotest directory out from master",

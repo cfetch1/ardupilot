@@ -17,8 +17,6 @@
 #include "AP_RPM.h"
 #include "RPM_Backend.h"
 
-#if AP_RPM_HARMONICNOTCH_ENABLED
-
 class AP_RPM_HarmonicNotch : public AP_RPM_Backend
 {
 public:
@@ -31,5 +29,3 @@ public:
 private:
     uint8_t instance;
 };
-
-#endif  // AP_RPM_HARMONICNOTCH_ENABLED

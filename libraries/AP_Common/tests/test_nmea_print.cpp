@@ -31,12 +31,15 @@ static DummyUart test_uart;
 
 TEST(NMEA, Printf)
 {
+    EXPECT_FALSE(nmea_printf(&test_uart, ""));
+    char test_string[] = "test\n";  // blabla not an NMEA string but whatever
+    const size_t len = strlen(test_string);
     // test not enought space
-    test_uart.set_txspace(2);
-    EXPECT_FALSE(nmea_printf(&test_uart, "TEST"));
+    test_uart.set_txspace(len-2);
+    EXPECT_FALSE(nmea_printf(&test_uart, test_string));
     // normal test
-    test_uart.set_txspace(9);
-    EXPECT_TRUE(nmea_printf(&test_uart, "TEST"));
+    test_uart.set_txspace(42);
+    EXPECT_TRUE(nmea_printf(&test_uart, test_string));
 }
 
 AP_GTEST_MAIN()

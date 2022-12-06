@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from lxml import etree
 
 from emit import Emit

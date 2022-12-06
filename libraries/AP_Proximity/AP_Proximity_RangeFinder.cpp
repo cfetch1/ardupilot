@@ -45,17 +45,17 @@ void AP_Proximity_RangeFinder::update(void)
             if (sensor->orientation() <= ROTATION_YAW_315) {
                 const uint8_t sector = (uint8_t)sensor->orientation();
                 const float angle = sector * 45;
-                const AP_Proximity_Boundary_3D::Face face = frontend.boundary.get_face(angle);
+                const AP_Proximity_Boundary_3D::Face face = boundary.get_face(angle);
                 // distance in meters
-                const float distance = sensor->distance();
+                const float distance_m = sensor->distance_cm() * 0.01f;
                 _distance_min = sensor->min_distance_cm() * 0.01f;
                 _distance_max = sensor->max_distance_cm() * 0.01f;
-                if ((distance <= _distance_max) && (distance >= _distance_min) && !ignore_reading(angle, distance, false)) {
-                    frontend.boundary.set_face_attributes(face, angle, distance, state.instance);
+                if ((distance_m <= _distance_max) && (distance_m >= _distance_min) && !check_obstacle_near_ground(angle, distance_m)) {
+                    boundary.set_face_attributes(face, angle, distance_m);
                     // update OA database
-                    database_push(angle, distance);
+                    database_push(angle, distance_m);
                 } else {
-                    frontend.boundary.reset_face(face, state.instance);
+                    boundary.reset_face(face);
                 }
                 _last_update_ms = now;
             }

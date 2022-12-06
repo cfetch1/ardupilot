@@ -24,10 +24,9 @@
 #include "AP_CANManager.h"
 #include <AP_Math/AP_Math.h>
 #include <AP_HAL/utility/sparse-endian.h>
-#include <AP_Vehicle/AP_Vehicle_Type.h>
-#include <GCS_MAVLink/GCS.h>
+#include <AP_Vehicle/AP_Vehicle.h>
 
-#define debug_can(level_debug, fmt, args...) do { AP::can().log_text(level_debug, "TestKDECAN",  fmt, ##args); } while (0)
+#define debug_can(level_debug, fmt, args...) do { AP::can().log_text(level_debug, "TestKDECAN",  fmt, #args); } while (0)
 extern const AP_HAL::HAL& hal;
 
 void AP_CANTester_KDECAN::count_msg(uint32_t frame_id)
@@ -95,10 +94,7 @@ void AP_CANTester_KDECAN::loop(void)
             if (esc_num != BROADCAST_NODE_ID) {
                 for (; i < NUM_ESCS; i++) {
                     if (object_address == UPDATE_NODE_ID_OBJ_ADDR) {
-                        uint64_t mcu_id;
-                        memcpy (&mcu_id, recv_frame.data, sizeof(mcu_id));
-                        mcu_id = be64toh(mcu_id);
-                        if (_esc_info[i].mcu_id == mcu_id) {
+                        if (_esc_info[i].mcu_id == be64toh(*((be64_t*) &(recv_frame.data[0])))) {
                             n = i + 1;
                             break;
                         }
@@ -154,16 +150,16 @@ void AP_CANTester_KDECAN::loop(void)
                     break;
                 }
                 case START_ENUM_OBJ_ADDR: {
-                    _esc_info[i].enum_timeout_ms = AP_HAL::millis() + be16toh_ptr(&recv_frame.data[0]);
+                    _esc_info[i].enum_timeout_ms = AP_HAL::millis() + be16toh(*((be16_t*) &(recv_frame.data[0])));
                     gcs().send_text(MAV_SEVERITY_ALERT, "KDECANTester: Starting enumeration for ESC %d, timeout %u", i, (unsigned)_esc_info[i].enum_timeout_ms);
                     i++;
                     continue;
                 }
                 case TELEMETRY_OBJ_ADDR: {
                     uint8_t data[8] {};
-                    put_le16_ptr(&data[0], get_random16());
-                    put_le16_ptr(&data[2], get_random16());
-                    put_le16_ptr(&data[4], get_random16());
+                    *((be16_t*) &data[0]) = htobe16(get_random16());
+                    *((be16_t*) &data[2]) = htobe16(get_random16());
+                    *((be16_t*) &data[4]) = htobe16(get_random16());
                     data[6] = uint8_t(float(rand()) / RAND_MAX * 40.0f + 15);
 
                     res_frame.dlc = 8;
@@ -202,12 +198,12 @@ void AP_CANTester_KDECAN::loop(void)
 
 void AP_CANTester_KDECAN::print_stats(void)
 {
-    DEV_PRINTF("KDECANTester: TimeStamp: %u\n", (unsigned)AP_HAL::micros());
+    hal.console->printf("KDECANTester: TimeStamp: %u\n", (unsigned)AP_HAL::micros());
     for (uint16_t i=0; i<100; i++) {
         if (counters[i].frame_id == 0) {
             break;
         }
-        DEV_PRINTF("0x%08x: %u\n", (unsigned)counters[i].frame_id, (unsigned)counters[i].count);
+        hal.console->printf("0x%08x: %u\n", (unsigned)counters[i].frame_id, (unsigned)counters[i].count);
         counters[i].count = 0;
     }
 }
@@ -222,10 +218,10 @@ bool AP_CANTester_KDECAN::send_enumeration(uint8_t num)
     }
 
     while (true) {
-        uint64_t mcu = 0;
-        mcu = htobe64(_esc_info[num].mcu_id);
+        uint8_t mcu[8] {};
+        *((be64_t*) mcu) = htobe64(_esc_info[num].mcu_id);
         AP_HAL::CANFrame res_frame { (_esc_info[num].node_id << 16) | START_ENUM_OBJ_ADDR | AP_HAL::CANFrame::FlagEFF,
-                                     (uint8_t*)&mcu,
+                                     mcu,
                                      8 };
         int16_t res = _can_iface->send(res_frame, AP_HAL::micros64() + 1000, 0);
         if (res == 1) {

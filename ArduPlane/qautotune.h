@@ -4,18 +4,15 @@
 
 #pragma once
 
-#include <AP_HAL/AP_HAL_Boards.h>
+#include <AP_HAL/AP_HAL.h>
 
-#include "quadplane.h"
-#ifndef QAUTOTUNE_ENABLED
-  #define QAUTOTUNE_ENABLED HAL_QUADPLANE_ENABLED && !HAL_MINIMIZE_FEATURES
-#endif
+#define QAUTOTUNE_ENABLED !HAL_MINIMIZE_FEATURES
 
 #if QAUTOTUNE_ENABLED
 
-#include <AC_AutoTune/AC_AutoTune_Multi.h>
+#include <AC_AutoTune/AC_AutoTune.h>
 
-class QAutoTune : public AC_AutoTune_Multi
+class QAutoTune : public AC_AutoTune
 {
 public:
     friend class QuadPlane;

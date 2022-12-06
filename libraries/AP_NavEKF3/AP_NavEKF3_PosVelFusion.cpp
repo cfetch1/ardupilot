@@ -104,7 +104,6 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
             stateStruct.position.xy() += gps_corrected.vel.xy()*0.001*tdiff;
             // set the variances using the position measurement noise parameter
             P[7][7] = P[8][8] = sq(MAX(gpsPosAccuracy,frontend->_gpsHorizPosNoise));
-#if EK3_FEATURE_BEACON_FUSION
         } else if ((imuSampleTime_ms - rngBcnLast3DmeasTime_ms < 250 && posResetSource == resetDataSource::DEFAULT) || posResetSource == resetDataSource::RNGBCN) {
             // use the range beacon data as a second preference
             stateStruct.position.x = receiverPos.x;
@@ -112,7 +111,6 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
             // set the variances from the beacon alignment filter
             P[7][7] = receiverPosCov[0][0];
             P[8][8] = receiverPosCov[1][1];
-#endif
 #if EK3_FEATURE_EXTERNAL_NAV
         } else if ((imuSampleTime_ms - extNavDataDelayed.time_ms < 250 && posResetSource == resetDataSource::DEFAULT) || posResetSource == resetDataSource::EXTNAV) {
             // use external nav data as the third preference
@@ -245,11 +243,8 @@ void NavEKF3_core::ResetHeight(void)
 
     // Reset the vertical velocity state using GPS vertical velocity if we are airborne
     // Check that GPS vertical velocity data is available and can be used
-    if (inFlight &&
-        (gpsIsInUse || badIMUdata) &&
-        frontend->sources.useVelZSource(AP_NavEKF_Source::SourceZ::GPS) &&
-        gpsDataNew.have_vz &&
-        (imuSampleTime_ms - gpsDataDelayed.time_ms < 500)) {
+    if (inFlight && !gpsNotAvailable && frontend->sources.useVelZSource(AP_NavEKF_Source::SourceZ::GPS) &&
+        gpsDataNew.have_vz) {
         stateStruct.velocity.z =  gpsDataNew.vel.z;
 #if EK3_FEATURE_EXTERNAL_NAV
     } else if (inFlight && useExtNavVel && (activeHgtSource == AP_NavEKF_Source::SourceZ::EXTNAV)) {
@@ -444,7 +439,7 @@ void NavEKF3_core::SelectVelPosFusion()
         CalculateVelInnovationsAndVariances(extNavVelDelayed.vel, extNavVelDelayed.err, frontend->extNavVelVarAccScale, extNavVelInnov, extNavVelVarInnov);
 
         // record time innovations were calculated (for timeout checks)
-        extNavVelInnovTime_ms = dal.millis();
+        extNavVelInnovTime_ms = AP_HAL::millis();
     }
 #endif // EK3_FEATURE_EXTERNAL_NAV
 
@@ -459,7 +454,7 @@ void NavEKF3_core::SelectVelPosFusion()
         // calculate innovations and variances for reporting purposes only
         CalculateVelInnovationsAndVariances(gpsDataDelayed.vel, frontend->_gpsHorizVelNoise, frontend->gpsNEVelVarAccScale, gpsVelInnov, gpsVelVarInnov);
         // record time innovations were calculated (for timeout checks)
-        gpsVelInnovTime_ms = dal.millis();
+        gpsVelInnovTime_ms = AP_HAL::millis();
     }
 
     // detect position source changes.  Trigger position reset if position source is valid
@@ -692,28 +687,17 @@ void NavEKF3_core::FuseVelPosNED()
             // calculate innovations for height and vertical GPS vel measurements
             const ftype hgtErr  = stateStruct.position.z - velPosObs[5];
             const ftype velDErr = stateStruct.velocity.z - velPosObs[2];
-            // Check if they are the same sign and both more than 3-sigma out of bounds
-            // Step the test threshold up in stages from 1 to 2 to 3 sigma after exiting
-            // from a previous bad IMU event so that a subsequent error is caught more quickly.
-            const uint32_t timeSinceLastBadIMU_ms = imuSampleTime_ms - badIMUdata_ms;
-            float R_gain;
-            if (timeSinceLastBadIMU_ms > (BAD_IMU_DATA_HOLD_MS * 2)) {
-                R_gain = 9.0F;
-            } else if  (timeSinceLastBadIMU_ms > ((BAD_IMU_DATA_HOLD_MS * 3) / 2)) {
-                R_gain = 4.0F;
-            } else {
-                R_gain = 1.0F;
-            }
-            if ((hgtErr*velDErr > 0.0f) && (sq(hgtErr) > R_gain * R_OBS[5]) && (sq(velDErr) >R_gain * R_OBS[2])) {
+            // check if they are the same sign and both more than 3-sigma out of bounds
+            if ((hgtErr*velDErr > 0.0f) && (sq(hgtErr) > 9.0f * R_OBS[5]) && (sq(velDErr) > 9.0f * R_OBS[2])) {
                 badIMUdata_ms = imuSampleTime_ms;
             } else {
                 goodIMUdata_ms = imuSampleTime_ms;
             }
-            if (timeSinceLastBadIMU_ms < BAD_IMU_DATA_HOLD_MS) {
+            if (imuSampleTime_ms - badIMUdata_ms < BAD_IMU_DATA_HOLD_MS) {
                 badIMUdata = true;
-                stateStruct.velocity.z = gpsDataDelayed.vel.z;
             } else {
                 badIMUdata = false;
+
             }
         }
 
@@ -844,7 +828,7 @@ void NavEKF3_core::FuseVelPosNED()
                 if (onGround) {
                     ftype dtBaro = (imuSampleTime_ms - lastHgtPassTime_ms) * 1.0e-3;
                     const ftype hgtInnovFiltTC = 2.0;
-                    ftype alpha = constrain_ftype(dtBaro/(dtBaro+hgtInnovFiltTC), 0.0, 1.0);
+                    ftype alpha = constrain_float(dtBaro/(dtBaro+hgtInnovFiltTC), 0.0, 1.0);
                     hgtInnovFiltState += (innovVelPos[5] - hgtInnovFiltState)*alpha;
                 } else {
                     hgtInnovFiltState = 0.0f;
@@ -1089,7 +1073,7 @@ void NavEKF3_core::selectHeightForFusion()
         // determine if we are above or below the height switch region
         ftype rangeMaxUse = 1e-4 * (ftype)_rng->max_distance_cm_orient(ROTATION_PITCH_270) * (ftype)frontend->_useRngSwHgt;
         bool aboveUpperSwHgt = (terrainState - stateStruct.position.z) > rangeMaxUse;
-        bool belowLowerSwHgt = ((terrainState - stateStruct.position.z) < 0.7f * rangeMaxUse) && (imuSampleTime_ms - gndHgtValidTime_ms < 1000);
+        bool belowLowerSwHgt = (terrainState - stateStruct.position.z) < 0.7f * rangeMaxUse;
 
         // If the terrain height is consistent and we are moving slowly, then it can be
         // used as a height reference in combination with a range finder
@@ -1097,7 +1081,7 @@ void NavEKF3_core::selectHeightForFusion()
         bool dontTrustTerrain, trustTerrain;
         if (filterStatus.flags.horiz_vel) {
             // We can use the velocity estimate
-            ftype horizSpeed = stateStruct.velocity.xy().length();
+            ftype horizSpeed = norm(stateStruct.velocity.x, stateStruct.velocity.y);
             dontTrustTerrain = (horizSpeed > frontend->_useRngSwSpd) || !terrainHgtStable;
             ftype trust_spd_trigger = MAX((frontend->_useRngSwSpd - 1.0f),(frontend->_useRngSwSpd * 0.5f));
             trustTerrain = (horizSpeed < trust_spd_trigger) && terrainHgtStable;
@@ -1127,10 +1111,8 @@ void NavEKF3_core::selectHeightForFusion()
         activeHgtSource = AP_NavEKF_Source::SourceZ::BARO;
     } else if ((frontend->sources.getPosZSource() == AP_NavEKF_Source::SourceZ::GPS) && ((imuSampleTime_ms - lastTimeGpsReceived_ms) < 500) && validOrigin && gpsAccuracyGood) {
         activeHgtSource = AP_NavEKF_Source::SourceZ::GPS;
-#if EK3_FEATURE_BEACON_FUSION
     } else if ((frontend->sources.getPosZSource() == AP_NavEKF_Source::SourceZ::BEACON) && validOrigin && rngBcnGoodToAlign) {
         activeHgtSource = AP_NavEKF_Source::SourceZ::BEACON;
-#endif
 #if EK3_FEATURE_EXTERNAL_NAV
     } else if ((frontend->sources.getPosZSource() == AP_NavEKF_Source::SourceZ::EXTNAV) && extNavDataIsFresh) {
         activeHgtSource = AP_NavEKF_Source::SourceZ::EXTNAV;
@@ -1139,17 +1121,9 @@ void NavEKF3_core::selectHeightForFusion()
 
     // Use Baro alt as a fallback if we lose range finder, GPS, external nav or Beacon
     bool lostRngHgt = ((activeHgtSource == AP_NavEKF_Source::SourceZ::RANGEFINDER) && !rangeFinderDataIsFresh);
-    bool lostGpsHgt = ((activeHgtSource == AP_NavEKF_Source::SourceZ::GPS) && ((imuSampleTime_ms - lastTimeGpsReceived_ms) > 2000 || !gpsAccuracyGoodForAltitude));
-#if EK3_FEATURE_BEACON_FUSION
+    bool lostGpsHgt = ((activeHgtSource == AP_NavEKF_Source::SourceZ::GPS) && ((imuSampleTime_ms - lastTimeGpsReceived_ms) > 2000));
     bool lostRngBcnHgt = ((activeHgtSource == AP_NavEKF_Source::SourceZ::BEACON) && ((imuSampleTime_ms - rngBcnDataDelayed.time_ms) > 2000));
-#endif
-    bool fallback_to_baro =
-        lostRngHgt
-        || lostGpsHgt
-#if EK3_FEATURE_BEACON_FUSION
-        || lostRngBcnHgt
-#endif
-        ;
+    bool fallback_to_baro = lostRngHgt || lostGpsHgt || lostRngBcnHgt;
 #if EK3_FEATURE_EXTERNAL_NAV
     bool lostExtNavHgt = ((activeHgtSource == AP_NavEKF_Source::SourceZ::EXTNAV) && !extNavDataIsFresh);
     fallback_to_baro |= lostExtNavHgt;
@@ -1246,12 +1220,11 @@ void NavEKF3_core::selectHeightForFusion()
         ResetPositionD(-hgtMea);
     }
 
-    // If we haven't fused height data for a while or have bad IMU data, then declare the height data as being timed out
-    // set height timeout period based on whether we have vertical GPS velocity available to constrain drift
+    // If we haven't fused height data for a while, then declare the height data as being timed out
+    // set timeout period based on whether we have vertical GPS velocity available to constrain drift
     hgtRetryTime_ms = ((useGpsVertVel || useExtNavVel) && !velTimeout) ? frontend->hgtRetryTimeMode0_ms : frontend->hgtRetryTimeMode12_ms;
     if (imuSampleTime_ms - lastHgtPassTime_ms > hgtRetryTime_ms ||
-        (badIMUdata &&
-        (imuSampleTime_ms - goodIMUdata_ms > BAD_IMU_DATA_TIMEOUT_MS))) {
+        (badIMUdata && (imuSampleTime_ms - goodIMUdata_ms < BAD_IMU_DATA_TIMEOUT_MS))) {
         hgtTimeout = true;
     } else {
         hgtTimeout = false;

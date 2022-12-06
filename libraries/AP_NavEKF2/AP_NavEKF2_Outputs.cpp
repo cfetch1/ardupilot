@@ -3,7 +3,6 @@
 #include "AP_NavEKF2_core.h"
 #include <AP_DAL/AP_DAL.h>
 #include <AP_AHRS/AP_AHRS.h>
-#include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -286,7 +285,9 @@ bool NavEKF2_core::getLLH(struct Location &loc) const
 
     if(getPosD(posD) && getOriginLLH(origin)) {
         // Altitude returned is an absolute altitude relative to the WGS-84 spherioid
-        loc.set_alt_cm(origin.alt - posD*100, Location::AltFrame::ABSOLUTE);
+        loc.alt =  origin.alt - posD*100;
+        loc.relative_alt = 0;
+        loc.terrain_alt = 0;
 
         // there are three modes of operation, absolute position (GPS fusion), relative position (optical flow fusion) and constant position (no aiding)
         if (filterStatus.flags.horiz_pos_abs || filterStatus.flags.horiz_pos_rel) {
@@ -321,7 +322,10 @@ bool NavEKF2_core::getLLH(struct Location &loc) const
         // If no origin has been defined for the EKF, then we cannot use its position states so return a raw
         // GPS reading if available and return false
         if ((gps.status() >= AP_DAL_GPS::GPS_OK_FIX_3D)) {
-            loc = gps.location();
+            const struct Location &gpsloc = gps.location();
+            loc = gpsloc;
+            loc.relative_alt = 0;
+            loc.terrain_alt = 0;
         }
         return false;
     }
@@ -373,8 +377,7 @@ void NavEKF2_core::getMagXYZ(Vector3f &magXYZ) const
 // return true if offsets are valid
 bool NavEKF2_core::getMagOffsets(uint8_t mag_idx, Vector3f &magOffsets) const
 {
-    const auto &compass = dal.compass();
-    if (!compass.available()) {
+    if (!dal.get_compass()) {
         return false;
     }
 
@@ -385,18 +388,18 @@ bool NavEKF2_core::getMagOffsets(uint8_t mag_idx, Vector3f &magOffsets) const
     if ((mag_idx == magSelectIndex) &&
             finalInflightMagInit &&
             !inhibitMagStates &&
-            compass.healthy(magSelectIndex) &&
+            dal.get_compass()->healthy(magSelectIndex) &&
             variancesConverged) {
-        magOffsets = compass.get_offsets(magSelectIndex) - (stateStruct.body_magfield*1000.0).tofloat();
+        magOffsets = dal.get_compass()->get_offsets(magSelectIndex) - (stateStruct.body_magfield*1000.0).tofloat();
         return true;
     } else {
-        magOffsets = compass.get_offsets(magSelectIndex);
+        magOffsets = dal.get_compass()->get_offsets(magSelectIndex);
         return false;
     }
 }
 
 // return the innovations for the NED Pos, NED Vel, XYZ Mag and Vtas measurements
-bool NavEKF2_core::getInnovations(Vector3f &velInnov, Vector3f &posInnov, Vector3f &magInnov, float &tasInnov, float &yawInnov) const
+void  NavEKF2_core::getInnovations(Vector3f &velInnov, Vector3f &posInnov, Vector3f &magInnov, float &tasInnov, float &yawInnov) const
 {
     velInnov.x = innovVelPos[0];
     velInnov.y = innovVelPos[1];
@@ -409,14 +412,12 @@ bool NavEKF2_core::getInnovations(Vector3f &velInnov, Vector3f &posInnov, Vector
     magInnov.z = 1e3f*innovMag[2]; // Convert back to sensor units
     tasInnov   = innovVtas;
     yawInnov   = innovYaw;
-
-    return true;
 }
 
 // return the innovation consistency test ratios for the velocity, position, magnetometer and true airspeed measurements
 // this indicates the amount of margin available when tuning the various error traps
 // also return the delta in position due to the last position reset
-bool NavEKF2_core::getVariances(float &velVar, float &posVar, float &hgtVar, Vector3f &magVar, float &tasVar, Vector2f &offset) const
+void  NavEKF2_core::getVariances(float &velVar, float &posVar, float &hgtVar, Vector3f &magVar, float &tasVar, Vector2f &offset) const
 {
     velVar   = sqrtF(velTestRatio);
     posVar   = sqrtF(posTestRatio);
@@ -427,8 +428,6 @@ bool NavEKF2_core::getVariances(float &velVar, float &posVar, float &hgtVar, Vec
     magVar.z = sqrtF(MAX(magTestRatio.z,yawTestRatio));
     tasVar   = sqrtF(tasTestRatio);
     offset   = posResetNE.tofloat();
-
-    return true;
 }
 
 
@@ -493,9 +492,8 @@ void  NavEKF2_core::getFilterGpsStatus(nav_gps_status &faults) const
     faults.flags.bad_horiz_vel      = gpsCheckStatus.bad_horiz_vel; // The GPS horizontal speed is excessive (check assumes the vehicle is static)
 }
 
-#if HAL_GCS_ENABLED
 // send an EKF_STATUS message to GCS
-void NavEKF2_core::send_status_report(GCS_MAVLINK &link) const
+void NavEKF2_core::send_status_report(mavlink_channel_t chan) const
 {
     // prepare flags
     uint16_t flags = 0;
@@ -534,7 +532,7 @@ void NavEKF2_core::send_status_report(GCS_MAVLINK &link) const
     }
 
     // get variances
-    float velVar = 0, posVar = 0, hgtVar = 0, tasVar = 0;
+    float velVar, posVar, hgtVar, tasVar;
     Vector3f magVar;
     Vector2f offset;
     getVariances(velVar, posVar, hgtVar, magVar, tasVar, offset);
@@ -552,9 +550,8 @@ void NavEKF2_core::send_status_report(GCS_MAVLINK &link) const
     }
 
     // send message
-    mavlink_msg_ekf_status_report_send(link.get_chan(), flags, velVar, posVar, hgtVar, mag_max, temp, tasVar);
+    mavlink_msg_ekf_status_report_send(chan, flags, velVar, posVar, hgtVar, mag_max, temp, tasVar);
 }
-#endif  // HAL_GCS_ENABLED
 
 // report the reason for why the backend is refusing to initialise
 const char *NavEKF2_core::prearm_failure_reason(void) const

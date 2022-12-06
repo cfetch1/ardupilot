@@ -118,7 +118,7 @@ bool AP_Compass_BMM150::_load_trim_values()
         }
     }
     if (-1 == tries) {
-        DEV_PRINTF("BMM150: Failed to load trim registers\n");
+        hal.console->printf("BMM150: Failed to load trim registers\n");
         return false;
     }
 
@@ -175,7 +175,7 @@ bool AP_Compass_BMM150::init()
             break;
         }
         if (boot_tries == 0) {
-            DEV_PRINTF("BMM150: Wrong chip ID 0x%02x should be 0x%02x\n", val, CHIP_ID_VAL);
+            hal.console->printf("BMM150: Wrong chip ID 0x%02x should be 0x%02x\n", val, CHIP_ID_VAL);
         }
     }
     if (-1 == boot_tries) {

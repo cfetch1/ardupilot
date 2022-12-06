@@ -46,7 +46,7 @@ void loop(void) {
     //increment the pin number
     pin = (pin+1) % 16;
     //set pin corresponding to the new pin value
-    IGNORE_RETURN(chan->set_pin(pin));
+    chan->set_pin(pin);
     //give a delay of 100ms
     hal.scheduler->delay(100);
 }

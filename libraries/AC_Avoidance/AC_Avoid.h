@@ -30,7 +30,8 @@ public:
     AC_Avoid();
 
     /* Do not allow copies */
-    CLASS_NO_COPY(AC_Avoid);
+    AC_Avoid(const AC_Avoid &other) = delete;
+    AC_Avoid &operator=(const AC_Avoid&) = delete;
 
     // get singleton instance
     static AC_Avoid *get_singleton() {

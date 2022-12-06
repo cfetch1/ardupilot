@@ -20,8 +20,12 @@ void Sub::init_ardupilot()
 #endif
 
     // init cargo gripper
-#if AP_GRIPPER_ENABLED
+#if GRIPPER_ENABLED == ENABLED
     g2.gripper.init();
+#endif
+
+#if AC_FENCE == ENABLED
+    fence.init();
 #endif
 
     // initialise notify system
@@ -36,23 +40,19 @@ void Sub::init_ardupilot()
     // Detection won't work until after BoardConfig.init()
     switch (AP_BoardConfig::get_board_type()) {
     case AP_BoardConfig::PX4_BOARD_PIXHAWK2:
-        AP_Param::set_default_by_name("BARO_EXT_BUS", 0);
+        AP_Param::set_default_by_name("GND_EXT_BUS", 0);
         break;
     case AP_BoardConfig::PX4_BOARD_PIXHAWK:
-        AP_Param::set_by_name("BARO_EXT_BUS", 1);
+        AP_Param::set_by_name("GND_EXT_BUS", 1);
         break;
     default:
-        AP_Param::set_default_by_name("BARO_EXT_BUS", 1);
+        AP_Param::set_default_by_name("GND_EXT_BUS", 1);
         break;
     }
-#elif CONFIG_HAL_BOARD != HAL_BOARD_LINUX
-    AP_Param::set_default_by_name("BARO_EXT_BUS", 1);
+#else
+    AP_Param::set_default_by_name("GND_EXT_BUS", 1);
 #endif
-
-#if AP_TEMPERATURE_SENSOR_ENABLED
-    // In order to preserve Sub's previous AP_TemperatureSensor Behavior we set the Default I2C Bus Here
-    AP_Param::set_default_by_name("TEMP1_BUS", barometer.external_bus());
-#endif
+    celsius.init(barometer.external_bus());
 
     // setup telem slots with serial ports
     gcs().setup_uarts();
@@ -62,9 +62,7 @@ void Sub::init_ardupilot()
 #endif
 
     // initialise rc channels including setting mode
-    rc().convert_options(RC_Channel::AUX_FUNC::ARMDISARM_UNUSED, RC_Channel::AUX_FUNC::ARMDISARM);
     rc().init();
-
 
     init_rc_in();               // sets up rc channels from radio
     init_rc_out();              // sets up motors and output to escs
@@ -85,11 +83,13 @@ void Sub::init_ardupilot()
     AP::compass().set_log_bit(MASK_LOG_COMPASS);
     AP::compass().init();
 
-#if AP_AIRSPEED_ENABLED
-    airspeed.set_log_bit(MASK_LOG_IMU);
+    // init Location class
+#if AP_TERRAIN_AVAILABLE && AC_TERRAIN
+    Location::set_terrain(&terrain);
+    wp_nav.set_terrain(&terrain);
 #endif
 
-#if AP_OPTICALFLOW_ENABLED
+#if OPTFLOW == ENABLED
     // initialise optical flow sensor
     optflow.init(MASK_LOG_OPTFLOW);
 #endif
@@ -98,7 +98,7 @@ void Sub::init_ardupilot()
     // initialise camera mount
     camera_mount.init();
     // This step ncessary so the servo is properly initialized
-    camera_mount.set_angle_target(0, 0, 0, false);
+    camera_mount.set_angle_targets(0, 0, 0);
     // for some reason the call to set_angle_targets changes the mode to mavlink targeting!
     camera_mount.set_mode(MAV_MOUNT_MODE_RC_TARGETING);
 #endif
@@ -141,7 +141,7 @@ void Sub::init_ardupilot()
 #endif
 
     // initialise AP_RPM library
-#if AP_RPM_ENABLED
+#if RPM_ENABLED == ENABLED
     rpm_sensor.init();
 #endif
 
@@ -155,9 +155,11 @@ void Sub::init_ardupilot()
 
     startup_INS_ground();
 
-#if AP_SCRIPTING_ENABLED
+#ifdef ENABLE_SCRIPTING
     g2.scripting.init();
-#endif // AP_SCRIPTING_ENABLED
+#endif // ENABLE_SCRIPTING
+
+    g2.airspeed.init();
 
     // we don't want writes to the serial port to cause us to pause
     // mid-flight, so set the serial ports non-blocking once we are
@@ -181,7 +183,7 @@ void Sub::startup_INS_ground()
 {
     // initialise ahrs (may push imu calibration into the mpu6000 if using that device).
     ahrs.init();
-    ahrs.set_vehicle_class(AP_AHRS::VehicleClass::SUBMARINE);
+    ahrs.set_vehicle_class(AHRS_VEHICLE_SUBMARINE);
 
     // Warm up and calibrate gyro offsets
     ins.init(scheduler.get_loop_rate_hz());
@@ -233,7 +235,7 @@ bool Sub::optflow_position_ok()
 
     // return immediately if neither optflow nor visual odometry is enabled
     bool enabled = false;
-#if AP_OPTICALFLOW_ENABLED
+#if OPTFLOW == ENABLED
     if (optflow.enabled()) {
         enabled = true;
     }

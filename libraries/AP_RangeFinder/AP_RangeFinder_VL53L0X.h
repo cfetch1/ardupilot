@@ -4,12 +4,6 @@
 #include "AP_RangeFinder_Backend.h"
 #include <AP_HAL/I2CDevice.h>
 
-#ifndef AP_RANGEFINDER_VL53L0X_ENABLED
-#define AP_RANGEFINDER_VL53L0X_ENABLED AP_RANGEFINDER_BACKEND_DEFAULT_ENABLED
-#endif
-
-#if AP_RANGEFINDER_VL53L0X_ENABLED
-
 class AP_RangeFinder_VL53L0X : public AP_RangeFinder_Backend
 {
 
@@ -86,5 +80,3 @@ private:
     uint32_t sum_mm;
     uint32_t counter;
 };
-
-#endif  // AP_RANGEFINDER_VL53L0X_ENABLED

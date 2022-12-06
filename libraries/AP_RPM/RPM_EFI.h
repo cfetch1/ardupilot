@@ -15,10 +15,8 @@
 #pragma once
 
 #include "AP_RPM.h"
-
-#if AP_RPM_EFI_ENABLED
-
 #include "RPM_Backend.h"
+#include <AP_EFI/AP_EFI.h>
 
 class AP_RPM_EFI : public AP_RPM_Backend
 {
@@ -32,5 +30,3 @@ public:
 private:
     uint8_t instance;
 };
-
-#endif

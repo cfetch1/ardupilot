@@ -76,7 +76,7 @@
 #endif
 
 #ifndef MONITOR_THD_WA_SIZE
-#define MONITOR_THD_WA_SIZE 1024
+#define MONITOR_THD_WA_SIZE 512
 #endif
 
 /* Scheduler implementation: */

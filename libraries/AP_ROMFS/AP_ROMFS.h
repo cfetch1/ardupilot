@@ -3,7 +3,7 @@
  */
 #pragma once
 
-#include <stdint.h>
+#include <AP_HAL/AP_HAL.h>
 
 class AP_ROMFS {
 public:

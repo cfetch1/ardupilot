@@ -60,6 +60,10 @@
 # define RANGEFINDER_GAIN_DEFAULT 0.8f     // gain for controlling how quickly rangefinder range adjusts target altitude (lower means slower reaction)
 #endif
 
+#ifndef SURFACE_TRACKING_VELZ_MAX
+# define SURFACE_TRACKING_VELZ_MAX 150     // max vertical speed change while surface tracking with rangefinder
+#endif
+
 #ifndef SURFACE_TRACKING_TIMEOUT_MS
 # define SURFACE_TRACKING_TIMEOUT_MS  1000 // surface tracking target alt will reset to current rangefinder alt after this many milliseconds without a good rangefinder alt
 #endif
@@ -91,9 +95,26 @@
 # define MAV_SYSTEM_ID          1
 #endif
 
+
+//////////////////////////////////////////////////////////////////////////////
+// Battery monitoring
+//
+#ifndef BOARD_VOLTAGE_MIN
+# define BOARD_VOLTAGE_MIN             4.3f        // min board voltage in volts for pre-arm checks
+#endif
+
+#ifndef BOARD_VOLTAGE_MAX
+# define BOARD_VOLTAGE_MAX             5.8f        // max board voltage in volts for pre-arm checks
+#endif
+
 // prearm GPS hdop check
 #ifndef GPS_HDOP_GOOD_DEFAULT
 # define GPS_HDOP_GOOD_DEFAULT         140     // minimum hdop that represents a good position.  used during pre-arm checks if fence is enabled
+#endif
+
+// GCS failsafe
+#ifndef FS_GCS
+# define FS_GCS                        DISABLED
 #endif
 
 // Radio failsafe while using RC_override
@@ -109,6 +130,10 @@
 // missing terrain data failsafe
 #ifndef FS_TERRAIN_TIMEOUT_MS
 #define FS_TERRAIN_TIMEOUT_MS          5000     // 5 seconds of missing terrain data will trigger failsafe (RTL)
+#endif
+
+#ifndef PREARM_DISPLAY_PERIOD
+# define PREARM_DISPLAY_PERIOD 30
 #endif
 
 // pre-arm baro vs inertial nav max alt disparity
@@ -129,6 +154,13 @@
 # define EKF_ORIGIN_MAX_DIST_M         50000   // EKF origin and waypoints (including home) must be within 50km
 #endif
 
+#ifndef COMPASS_CAL_STICK_GESTURE_TIME
+#define COMPASS_CAL_STICK_GESTURE_TIME 2.0f // 2 seconds
+#endif
+#ifndef COMPASS_CAL_STICK_DELAY
+#define COMPASS_CAL_STICK_DELAY 5.0f
+#endif
+
 //////////////////////////////////////////////////////////////////////////////
 //  OPTICAL_FLOW
 #ifndef OPTFLOW
@@ -142,9 +174,27 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
+//  Crop Sprayer - enabled only on larger firmwares
+#ifndef SPRAYER_ENABLED
+# define SPRAYER_ENABLED  HAL_SPRAYER_ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 // Precision Landing with companion computer or IRLock sensor
 #ifndef PRECISION_LANDING
 # define PRECISION_LANDING ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+// gripper - enabled only on larger firmwares
+#ifndef GRIPPER_ENABLED
+# define GRIPPER_ENABLED !HAL_MINIMIZE_FEATURES
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+// rotations per minute sensor support
+#ifndef RPM_ENABLED
+# define RPM_ENABLED !HAL_MINIMIZE_FEATURES
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -250,6 +300,12 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
+// Button - Enable the button connected to AUX1-6
+#ifndef BUTTON_ENABLED
+# define BUTTON_ENABLED ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 // RADIO CONFIGURATION
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -330,6 +386,13 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
+// CAMERA TRIGGER AND CONTROL
+//
+#ifndef CAMERA
+# define CAMERA        ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 // Flight mode definitions
 //
 
@@ -404,6 +467,10 @@
 # define WP_YAW_BEHAVIOR_DEFAULT   WP_YAW_BEHAVIOR_LOOK_AT_NEXT_WP_EXCEPT_RTL
 #endif
 
+#ifndef AUTO_YAW_SLEW_RATE
+# define AUTO_YAW_SLEW_RATE    60              // degrees/sec
+#endif
+
 #ifndef YAW_LOOK_AHEAD_MIN_SPEED
 # define YAW_LOOK_AHEAD_MIN_SPEED  100             // minimum ground speed in cm/s required before blimp is aimed at ground course
 #endif
@@ -416,6 +483,9 @@
 #endif
 #ifndef DEFAULT_ANGLE_MAX
 # define DEFAULT_ANGLE_MAX         4500            // ANGLE_MAX parameters default value
+#endif
+#ifndef ANGLE_RATE_MAX
+# define ANGLE_RATE_MAX            18000           // default maximum rotation rate in roll/pitch axis requested by angle controller used in stabilize, loiter, rtl, auto flight modes
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -452,6 +522,15 @@
 #endif
 #ifndef PILOT_ACCEL_Z_DEFAULT
 # define PILOT_ACCEL_Z_DEFAULT 250 // vertical acceleration in cm/s/s while altitude is under pilot control
+#endif
+
+// max distance in cm above or below current location that will be used for the alt target when transitioning to alt-hold mode
+#ifndef ALT_HOLD_INIT_MAX_OVERSHOOT
+# define ALT_HOLD_INIT_MAX_OVERSHOOT 200
+#endif
+// the acceleration used to define the distance-velocity curve
+#ifndef ALT_HOLD_ACCEL_MAX
+# define ALT_HOLD_ACCEL_MAX 250    // if you change this you must also update the duplicate declaration in AC_WPNav.h
 #endif
 
 #ifndef AUTO_DISARMING_DELAY

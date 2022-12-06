@@ -21,8 +21,6 @@
 #include <AP_Rally/AP_Rally.h>
 #include <AP_Logger/AP_Logger.h>
 
-#if HAL_RALLY_ENABLED
-
 void GCS_MAVLINK::handle_rally_point(const mavlink_message_t &msg) const
 {
     AP_Rally *r = AP::rally();
@@ -105,4 +103,3 @@ void GCS_MAVLINK::handle_common_rally_message(const mavlink_message_t &msg)
         break;
     }
 }
-#endif //#if HAL_RALLY_ENABLED

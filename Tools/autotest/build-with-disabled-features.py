@@ -19,11 +19,9 @@ lckfile='/home/pbarker/rc/buildlogs/autotest.lck'
 >>>> PASSED STEP: build.ArduCopter at Thu Feb 22 09:46:43 2018
 check step:  build.ArduCopter
 BWFD: ADVANCED_FAILSAFE OK
-BWFD: Successes: ['MOUNT', 'AUTOTUNE_ENABLED', 'AP_FENCE_ENABLED', 'CAMERA', 'RANGEFINDER_ENABLED', 'PROXIMITY_ENABLED', 'AC_RALLY', 'AC_AVOID_ENABLED', 'PARACHUTE', 'NAV_GUIDED', 'OPTFLOW', 'VISUAL_ODOMETRY_ENABLED', 'ADSB_ENABLED', 'PRECISION_LANDING', 'SPRAYER', 'WINCH_ENABLED', 'ADVANCED_FAILSAFE']
+BWFD: Successes: ['MOUNT', 'AUTOTUNE_ENABLED', 'AC_FENCE', 'CAMERA', 'RANGEFINDER_ENABLED', 'PROXIMITY_ENABLED', 'AC_RALLY', 'AC_AVOID_ENABLED', 'AC_TERRAIN', 'PARACHUTE', 'NAV_GUIDED', 'OPTFLOW', 'VISUAL_ODOMETRY_ENABLED', 'FRSKY_TELEM_ENABLED', 'ADSB_ENABLED', 'PRECISION_LANDING', 'SPRAYER', 'WINCH_ENABLED', 'ADVANCED_FAILSAFE']
 BWFD: Failures: ['LOGGING_ENABLED']
 pbarker@bluebottle:~/rc/ardupilot(build-with-disabled-features)$ q
-
-AP_FLAKE8_CLEAN
 
 ''' # noqa
 
@@ -68,7 +66,7 @@ class Builder():
 
     def get_config_variables(self):
         ret = []
-        r = (r' *# *define +([A-Z_]+)\s+'
+        r = (' *# *define +([A-Z_]+)\s+'
              '(ENABLED|DISABLED|!HAL_MINIMIZE_FEATURES)')
         with open(util.reltopdir(self.config)) as fd:
             for line in fd:
@@ -91,7 +89,7 @@ class Builder():
             with open(util.reltopdir(tmpfile)) as fd:
                 did_enable = False
                 for line in fd:
-                    regex = r' *# *define +%s\s+(ENABLED|DISABLED|!HAL_MINIMIZE_FEATURES)' % (var[0],)
+                    regex = ' *# *define +%s\s+(ENABLED|DISABLED|!HAL_MINIMIZE_FEATURES)' % (var[0],)
                     match = re.match(regex, line)
                     if match is not None:
                         if (match.group(1) in ["ENABLED",
@@ -111,7 +109,7 @@ class Builder():
                 for line in fd:
                     things_to_toggle = self.reverse_deps_for_var(var[0])
                     for thing in things_to_toggle:
-                        regex = r' *# *define +%s\s+(ENABLED|DISABLED|!HAL_MINIMIZE_FEATURES)' % thing
+                        regex = ' *# *define +%s\s+(ENABLED|DISABLED|!HAL_MINIMIZE_FEATURES)' % thing
                         match = re.match(regex, line)
                         if match is not None:
                             if did_enable:
@@ -186,7 +184,7 @@ class Builder():
 class BuilderCopter(Builder):
     def get_config_variables(self):
         ret = []
-        r = r'//#define ([A-Z_]+)\s+(ENABLED|DISABLED!HAL_MINIMIZE_FEATURES)'
+        r = '//#define ([A-Z_]+)\s+(ENABLED|DISABLED!HAL_MINIMIZE_FEATURES)'
         with open(util.reltopdir(self.config)) as fd:
             for line in fd:
                 print("line: %s" % line)
@@ -196,8 +194,8 @@ class BuilderCopter(Builder):
         return ret
 
 
-# read reverse dep "MODE_AUTO_ENABLED": ["MODE_GUIDED"] thusly:
-# "if mode-auto is disabled then you must also disable guided mode"
+# read reverse dep "MODE_AUTO_ENABLED": ["AC_TERRAIN", "MODE_GUIDED"] thusly:
+# "if mode-auto is disabled then you must also disable terrain and guided mode"
 
 specs = [
     {
@@ -205,13 +203,15 @@ specs = [
         "autotest_target": "build.Copter",
         "target_binary": "bin/arducopter",
         "reverse-deps": {
-            "AP_FENCE_ENABLED": ["AC_AVOID_ENABLED", "MODE_FOLLOW_ENABLED"],
+            "AC_FENCE": ["AC_AVOID_ENABLED", "MODE_FOLLOW_ENABLED"],
             "PROXIMITY_ENABLED": ["AC_AVOID_ENABLED", "MODE_FOLLOW_ENABLED"],
-            "MODE_AUTO_ENABLED": ["MODE_GUIDED", "ADVANCED_FAILSAFE"],
-            "MODE_RTL_ENABLED": ["MODE_AUTO_ENABLED", "MODE_SMARTRTL_ENABLED"],
+            "AC_RALLY": ["AC_TERRAIN"],
+            "MODE_AUTO_ENABLED": ["AC_TERRAIN", "MODE_GUIDED", "ADVANCED_FAILSAFE"],
+            "MODE_RTL_ENABLED": ["MODE_AUTO_ENABLED", "AC_TERRAIN", "MODE_SMARTRTL_ENABLED"],
             "BEACON_ENABLED": ["AC_AVOID_ENABLED", "MODE_FOLLOW_ENABLED"],
-            "MODE_CIRCLE_ENABLED": ["MODE_AUTO_ENABLED", "AP_TERRAIN_AVAILABLE"],
+            "MODE_CIRCLE_ENABLED": ["MODE_AUTO_ENABLED", "AC_TERRAIN"],
             "MODE_GUIDED_ENABLED": ["MODE_AUTO_ENABLED",
+                                    "AC_TERRAIN",
                                     "ADSB_ENABLED",
                                     "MODE_FOLLOW_ENABLED",
                                     "MODE_GUIDED_NOGPS_ENABLED"],
@@ -226,13 +226,15 @@ specs = [
                               "MODE_ACRO_ENABLED",
                               "AUTOTUNE_ENABLED"],
         "reverse-deps": {
-            "AP_FENCE_ENABLED": ["AC_AVOID_ENABLED", "MODE_FOLLOW_ENABLED"],
+            "AC_FENCE": ["AC_AVOID_ENABLED", "MODE_FOLLOW_ENABLED"],
             "PROXIMITY_ENABLED": ["AC_AVOID_ENABLED", "MODE_FOLLOW_ENABLED"],
-            "MODE_AUTO_ENABLED": ["MODE_GUIDED", "ADVANCED_FAILSAFE"],
-            "MODE_RTL_ENABLED": ["MODE_AUTO_ENABLED", "MODE_SMARTRTL_ENABLED"],
+            "AC_RALLY": ["AC_TERRAIN"],
+            "MODE_AUTO_ENABLED": ["AC_TERRAIN", "MODE_GUIDED", "ADVANCED_FAILSAFE"],
+            "MODE_RTL_ENABLED": ["MODE_AUTO_ENABLED", "AC_TERRAIN", "MODE_SMARTRTL_ENABLED"],
             "BEACON_ENABLED": ["AC_AVOID_ENABLED", "MODE_FOLLOW_ENABLED"],
-            "MODE_CIRCLE_ENABLED": ["MODE_AUTO_ENABLED"],
+            "MODE_CIRCLE_ENABLED": ["MODE_AUTO_ENABLED", "AC_TERRAIN"],
             "MODE_GUIDED_ENABLED": ["MODE_AUTO_ENABLED",
+                                    "AC_TERRAIN",
                                     "ADSB_ENABLED",
                                     "MODE_FOLLOW_ENABLED",
                                     "MODE_GUIDED_NOGPS_ENABLED"],
@@ -256,8 +258,9 @@ specs = [
         "autotest_target": "build.Sub",
         "target_binary": "bin/ardusub",
         "reverse-deps": {
-            "AP_FENCE_ENABLED": ["AVOIDANCE_ENABLED"],
+            "AC_FENCE": ["AVOIDANCE_ENABLED"],
             "PROXIMITY_ENABLED": ["AVOIDANCE_ENABLED"],
+            "AC_RALLY": ["AC_TERRAIN"],
         },
     }, {
         "config": 'AntennaTracker/config.h',
@@ -269,24 +272,24 @@ specs = [
 ]
 
 
-if __name__ == '__main__':
-    builders = []
+builders = []
 
-    # append autotest builders:
-    for spec in specs:
-        builder = Builder(spec, autotest=True)
+# append autotest builders:
+for spec in specs:
+    builder = Builder(spec, autotest=True)
+    builder.run()
+    builders.append(builder)
+
+# append directly-build-by-waf targets
+for spec in specs:
+    for board in ["CubeOrange"]:
+        builder = Builder(spec, board=board)
         builder.run()
         builders.append(builder)
 
-    # append directly-build-by-waf targets
-    for spec in specs:
-        for board in ["CubeOrange"]:
-            builder = Builder(spec, board=board)
-            builder.run()
-            builders.append(builder)
 
-    print("")
-    for builder in builders:
-        print("Builder: %s" % builder.description())
-        #    print("  Successes: %s" % builder.successes)
-        print("   Failures: %s" % builder.failures)
+print("")
+for builder in builders:
+    print("Builder: %s" % builder.description())
+#    print("  Successes: %s" % builder.successes)
+    print("   Failures: %s" % builder.failures)

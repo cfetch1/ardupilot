@@ -18,16 +18,6 @@ ifeq ($(USE_CPPOPT),)
   USE_CPPOPT = -fno-rtti -std=gnu++11
 endif
 
-# Assembly specific options here (added to USE_OPT).
-ifeq ($(USE_ASOPT),)
-  USE_ASOPT = 
-endif
-
-# Assembly specific options here (added to USE_ASXOPT).
-ifeq ($(USE_ASXOPT),)
-  USE_ASXOPT =
-endif
-
 # Enable this if you want the linker to remove unused code and data
 ifeq ($(USE_LINK_GC),)
   USE_LINK_GC = yes
@@ -138,12 +128,6 @@ CSRC += $(HWDEF)/common/stubs.c \
 
 #	   $(TESTSRC) \
 #	   test.c
-ifneq ($(CRASHCATCHER),)
-LIBCC_CSRC = $(CRASHCATCHER)/Core/src/CrashCatcher.c \
-             $(HWDEF)/common/crashdump.c
-
-LIBCC_ASMXSRC = $(CRASHCATCHER)/Core/src/CrashCatcher_armv7m.S
-endif
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -176,9 +160,6 @@ ASMXSRC = $(ALLXASMSRC)
 INCDIR = $(CHIBIOS)/os/license \
          $(ALLINC) $(HWDEF)/common
 
-ifneq ($(CRASHCATCHER),)
-INCDIR += $(CRASHCATCHER)/include
-endif
 #
 # Project, sources and paths
 ##############################################################################
@@ -211,10 +192,10 @@ AOPT =
 TOPT = -mthumb -DTHUMB
 
 # Define C warning options here
-CWARN = -Wall -Wextra -Wundef -Wstrict-prototypes -Werror
+CWARN = -Wall -Wextra -Wundef -Wstrict-prototypes
 
 # Define C++ warning options here
-CPPWARN = -Wall -Wextra -Wundef -Werror
+CPPWARN = -Wall -Wextra -Wundef
 
 #
 # Compiler settings
@@ -225,8 +206,7 @@ CPPWARN = -Wall -Wextra -Wundef -Werror
 #
 
 # List all user C define here, like -D_DEBUG=1
-UDEFS = $(ENV_UDEFS) $(FATFS_FLAGS) -DHAL_BOARD_NAME=\"$(HAL_BOARD_NAME)\" \
-        -DHAL_MAX_STACK_FRAME_SIZE=$(HAL_MAX_STACK_FRAME_SIZE)
+UDEFS = $(ENV_UDEFS) $(FATFS_FLAGS) -DHAL_BOARD_NAME=\"$(HAL_BOARD_NAME)\"
 
 ifeq ($(ENABLE_ASSERTS),yes)
  UDEFS += -DHAL_CHIBIOS_ENABLE_ASSERTS

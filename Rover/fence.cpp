@@ -3,12 +3,11 @@
 // fence_check - ask fence library to check for breaches and initiate the response
 void Rover::fence_check()
 {
-#if AP_FENCE_ENABLED
     uint8_t new_breaches;  // the type of fence that has been breached
-    const uint8_t orig_breaches = fence.get_breaches();
+    const uint8_t orig_breaches = g2.fence.get_breaches();
 
     // check for a breach
-    new_breaches = fence.check();
+    new_breaches = g2.fence.check();
 
     // return immediately if motors are not armed
     if (!arming.is_armed()) {
@@ -18,10 +17,10 @@ void Rover::fence_check()
     // if there is a new breach take action
     if (new_breaches) {
         // if the user wants some kind of response and motors are armed
-        if (fence.get_action() != Failsafe_Action_None) {
+        if (g2.fence.get_action() != Failsafe_Action_None) {
             // if within 100m of the fence, it will take the action specified by the FENCE_ACTION parameter
-            if (fence.get_breach_distance(new_breaches) <= AC_FENCE_GIVE_UP_DISTANCE) {
-                switch (fence.get_action()) {
+            if (g2.fence.get_breach_distance(new_breaches) <= AC_FENCE_GIVE_UP_DISTANCE) {
+                switch (g2.fence.get_action()) {
                 case Failsafe_Action_None:
                     break;
                 case Failsafe_Action_RTL:
@@ -57,5 +56,4 @@ void Rover::fence_check()
         AP::logger().Write_Error(LogErrorSubsystem::FAILSAFE_FENCE,
                                  LogErrorCode::ERROR_RESOLVED);
     }
-#endif // AP_FENCE_ENABLED
 }

@@ -14,13 +14,11 @@
  */
 #pragma once
 
-#include "AP_Beacon_config.h"
-
-#if AP_BEACON_ENABLED
-
 #include <AP_Common/AP_Common.h>
+#include <AP_HAL/AP_HAL.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Math/AP_Math.h>
+#include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_Common/Location.h>
 
 class AP_Beacon_Backend;
@@ -34,7 +32,7 @@ class AP_Beacon
 public:
     friend class AP_Beacon_Backend;
 
-    AP_Beacon();
+    AP_Beacon(AP_SerialManager &_serial_manager);
 
     // get singleton instance
     static AP_Beacon *get_singleton() { return _singleton; }
@@ -106,9 +104,6 @@ public:
 
     static const struct AP_Param::GroupInfo var_info[];
 
-    // a method for vehicles to call to make onboard log messages:
-    void log();
-
 private:
 
     static AP_Beacon *_singleton;
@@ -133,6 +128,7 @@ private:
 
     // external references
     AP_Beacon_Backend *_driver;
+    AP_SerialManager &serial_manager;
 
     // last known position
     Vector3f veh_pos_ned;
@@ -152,5 +148,3 @@ private:
 namespace AP {
     AP_Beacon *beacon();
 };
-
-#endif  // AP_BEACON_ENABLED

@@ -21,8 +21,10 @@ void RC_Channel_Rover::mode_switch_changed(modeswitch_pos_t new_pos)
         // should not have been called
         return;
     }
-
-    rover.set_mode((Mode::Number)rover.modes[new_pos].get(), ModeReason::RC_COMMAND);
+    Mode *new_mode = rover.mode_from_mode_num((Mode::Number)rover.modes[new_pos].get());
+    if (new_mode != nullptr) {
+        rover.set_mode(*new_mode, ModeReason::RC_COMMAND);
+    }
 }
 
 // init_aux_switch_function - initialize aux functions
@@ -45,7 +47,7 @@ void RC_Channel_Rover::init_aux_function(const aux_func_t ch_option, const AuxSw
     case AUX_FUNC::WALKING_HEIGHT:
     case AUX_FUNC::RTL:
     case AUX_FUNC::SAILBOAT_TACK:
-    case AUX_FUNC::TRIM_TO_CURRENT_SERVO_RC:
+    case AUX_FUNC::SAVE_TRIM:
     case AUX_FUNC::SAVE_WP:
     case AUX_FUNC::SIMPLE:
     case AUX_FUNC::SMART_RTL:
@@ -139,7 +141,6 @@ bool RC_Channel_Rover::do_aux_function(const aux_func_t ch_option, const AuxSwit
             // if disarmed clear mission and set home to current location
             if (!rover.arming.is_armed()) {
                 rover.mode_auto.mission.clear();
-                gcs().send_text(MAV_SEVERITY_NOTICE, "SaveWP: Mission cleared!");
                 if (!rover.set_home_to_current_location(false)) {
                     // ignored
                 }
@@ -231,7 +232,7 @@ bool RC_Channel_Rover::do_aux_function(const aux_func_t ch_option, const AuxSwit
         break;
 
     // save steering trim
-    case AUX_FUNC::TRIM_TO_CURRENT_SERVO_RC:
+    case AUX_FUNC::SAVE_TRIM:
         if (!rover.g2.motors.have_skid_steering() && rover.arming.is_armed() &&
             (rover.control_mode != &rover.mode_loiter)
             && (rover.control_mode != &rover.mode_hold) && ch_flag == AuxSwitchPos::HIGH) {

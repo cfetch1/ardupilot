@@ -1,6 +1,5 @@
 #pragma once
-#include <AP_HAL/AP_HAL_Boards.h>
-#include <AP_HAL/Semaphores.h>
+#include <AP_HAL/AP_HAL.h>
 
 #if HAL_ENABLE_LIBUAVCAN_DRIVERS
 #include <uavcan/uavcan.hpp>
@@ -12,7 +11,6 @@
 class AllocationCb;
 class NodeStatusCb;
 class NodeInfoCb;
-class GetNodeInfoCb;
 class AP_UAVCAN;
 
 class AP_UAVCAN_DNA_Server
@@ -25,7 +23,6 @@ class AP_UAVCAN_DNA_Server
     };
 
     enum ServerState {
-        NODE_STATUS_UNHEALTHY = -5,
         STORAGE_FAILURE = -3,
         DUPLICATE_NODES = -2,
         FAILED_TO_ADD_NODE = -1,
@@ -41,7 +38,6 @@ class AP_UAVCAN_DNA_Server
     Bitmask<128> verified_mask;
     Bitmask<128> node_seen_mask;
     Bitmask<128> logged;
-    Bitmask<128> node_healthy_mask;
 
     uint8_t last_logging_count;
 
@@ -54,6 +50,8 @@ class AP_UAVCAN_DNA_Server
     //Allocation params
     uint8_t rcvd_unique_id[16];
     uint8_t rcvd_unique_id_offset;
+    uint8_t current_driver_index;
+    uint32_t last_activity_ms;
     uint32_t last_alloc_msg_ms;
 
     //Methods to handle and report Node IDs seen on the bus
@@ -89,24 +87,18 @@ class AP_UAVCAN_DNA_Server
     //Look in the storage and check if there's a valid Server Record there
     bool isValidNodeDataAvailable(uint8_t node_id);
 
-    static void trampoline_handleNodeInfo(AP_UAVCAN* ap_uavcan, uint8_t node_id, const GetNodeInfoCb& resp);
-    static void trampoline_handleAllocation(AP_UAVCAN* ap_uavcan, uint8_t node_id, const AllocationCb &cb);
-    static void trampoline_handleNodeStatus(AP_UAVCAN* ap_uavcan, uint8_t node_id, const NodeStatusCb &cb);
-
-
-    HAL_Semaphore storage_sem;
+    HAL_Semaphore sem;
     AP_UAVCAN *_ap_uavcan;
-    uint8_t driver_index;
 
 public:
-    AP_UAVCAN_DNA_Server(AP_UAVCAN *ap_uavcan, StorageAccess _storage);
-
+    AP_UAVCAN_DNA_Server(StorageAccess _storage) : storage(_storage) {}
 
     // Do not allow copies
-    CLASS_NO_COPY(AP_UAVCAN_DNA_Server);
+    AP_UAVCAN_DNA_Server(const AP_UAVCAN_DNA_Server &other) = delete;
+    AP_UAVCAN_DNA_Server &operator=(const AP_UAVCAN_DNA_Server&) = delete;
 
     //Initialises publisher and Server Record for specified uavcan driver
-    bool init();
+    bool init(AP_UAVCAN *ap_uavcan);
 
     //Reset the Server Record
     void reset();
@@ -125,12 +117,16 @@ public:
     bool prearm_check(char* fail_msg, uint8_t fail_msg_len) const;
 
     //Callbacks
-    void handleAllocation(uint8_t node_id, const AllocationCb &cb);
+    void handleAllocation(uint8_t driver_index, uint8_t node_id, const AllocationCb &cb);
     void handleNodeStatus(uint8_t node_id, const NodeStatusCb &cb);
     void handleNodeInfo(uint8_t node_id, uint8_t unique_id[], char name[], uint8_t major, uint8_t minor, uint32_t vcs_commit);
 
     //Run through the list of seen node ids for verification
-    void verify_nodes();
+    void verify_nodes(AP_UAVCAN *ap_uavcan);
 };
 
+namespace AP
+{
+AP_UAVCAN_DNA_Server& uavcan_dna_server();
+}
 #endif

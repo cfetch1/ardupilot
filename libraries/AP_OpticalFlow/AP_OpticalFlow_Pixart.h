@@ -1,20 +1,13 @@
 #pragma once
 
-#include "AP_OpticalFlow.h"
-
-#ifndef AP_OPTICALFLOW_PIXART_ENABLED
-#define AP_OPTICALFLOW_PIXART_ENABLED AP_OPTICALFLOW_ENABLED
-#endif
-
-#if AP_OPTICALFLOW_PIXART_ENABLED
-
+#include "OpticalFlow.h"
 #include <AP_HAL/utility/OwnPtr.h>
 
 class AP_OpticalFlow_Pixart : public OpticalFlow_backend
 {
 public:
     /// constructor
-    AP_OpticalFlow_Pixart(const char *devname, AP_OpticalFlow &_frontend);
+    AP_OpticalFlow_Pixart(const char *devname, OpticalFlow &_frontend);
 
     // init - initialise the sensor
     void init() override {}
@@ -23,7 +16,7 @@ public:
     void update(void) override;
 
     // detect if the sensor is available
-    static AP_OpticalFlow_Pixart *detect(const char *devname, AP_OpticalFlow &_frontend);
+    static AP_OpticalFlow_Pixart *detect(const char *devname, OpticalFlow &_frontend);
 
 private:
     AP_HAL::OwnPtr<AP_HAL::SPIDevice> _dev;
@@ -82,5 +75,3 @@ private:
     uint32_t last_burst_us;
     uint32_t last_update_ms;
 };
-
-#endif  // AP_OPTICALFLOW_PIXART_ENABLED

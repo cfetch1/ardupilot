@@ -18,8 +18,6 @@
 
 #include "SIM_Morse.h"
 
-#if HAL_SIM_MORSE_ENABLED
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -673,5 +671,3 @@ void Morse::send_report(void)
     }
 
 }
-
-#endif  // HAL_SIM_MORSE_ENABLED

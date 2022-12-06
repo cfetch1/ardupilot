@@ -9,6 +9,6 @@ class AP_BattMonitor_SMBus_Rotoye : public AP_BattMonitor_SMBus_Generic
 private:
 
     // Rotoye Batmon has two temperature readings
-    void read_temp(void) override;
+    bool read_temp(void) override;
 
 };

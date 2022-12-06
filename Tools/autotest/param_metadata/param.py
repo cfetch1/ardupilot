@@ -113,7 +113,6 @@ known_units = {
              'octal'   : 'octal'                 ,
              'RPM'     : 'Revolutions Per Minute',
              'kg/m/m'  : 'kilograms per square meter', # metre is the SI unit name, meter is the american spelling of it
-             'kg/m/m/m': 'kilograms per cubic meter',
              }
 
 required_param_fields = [
@@ -122,11 +121,6 @@ required_param_fields = [
              'User',
                       ]
 
-required_library_param_fields = [
-             'Description',
-             'DisplayName',
-                      ]
-    
 known_group_fields = [
                       'Path',
                       ]

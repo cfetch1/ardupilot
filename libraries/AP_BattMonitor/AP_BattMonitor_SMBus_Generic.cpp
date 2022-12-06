@@ -3,6 +3,7 @@
 #include <AP_Math/AP_Math.h>
 #include "AP_BattMonitor.h"
 #include "AP_BattMonitor_SMBus_Generic.h"
+#include <utility>
 
 uint8_t smbus_cell_ids[] = { 0x3f,  // cell 1
                              0x3e,  // cell 2
@@ -22,6 +23,7 @@ uint8_t smbus_cell_ids[] = { 0x3f,  // cell 1
 #endif
 };
 
+#define SMBUS_READ_BLOCK_MAXIMUM_TRANSFER    0x20   // A Block Read or Write is allowed to transfer a maximum of 32 data bytes.
 #define SMBUS_CELL_COUNT_CHECK_TIMEOUT       15     // check cell count for up to 15 seconds
 
 /*
@@ -42,8 +44,9 @@ uint8_t smbus_cell_ids[] = { 0x3f,  // cell 1
 // Constructor
 AP_BattMonitor_SMBus_Generic::AP_BattMonitor_SMBus_Generic(AP_BattMonitor &mon,
                                                    AP_BattMonitor::BattMonitor_State &mon_state,
-                                                   AP_BattMonitor_Params &params)
-    : AP_BattMonitor_SMBus(mon, mon_state, params, AP_BATTMONITOR_SMBUS_BUS_EXTERNAL)
+                                                   AP_BattMonitor_Params &params,
+                                                   AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev)
+    : AP_BattMonitor_SMBus(mon, mon_state, params, std::move(dev))
 {}
 
 void AP_BattMonitor_SMBus_Generic::timer()
@@ -58,7 +61,7 @@ void AP_BattMonitor_SMBus_Generic::timer()
 
     // read voltage (V)
     if (read_word(BATTMONITOR_SMBUS_VOLTAGE, data)) {
-        _state.voltage = (float)data * 0.001f;
+        _state.voltage = (float)data / 1000.0f;
         _state.last_time_micros = tnow;
         _state.healthy = true;
     }
@@ -111,7 +114,7 @@ void AP_BattMonitor_SMBus_Generic::timer()
 
     // read current (A)
     if (read_word(BATTMONITOR_SMBUS_CURRENT, data)) {
-        _state.current_amps = -(float)((int16_t)data) * 0.001f;
+        _state.current_amps = -(float)((int16_t)data) / 1000.0f;
         _state.last_time_micros = tnow;
     }
 
@@ -125,6 +128,50 @@ void AP_BattMonitor_SMBus_Generic::timer()
     read_serial_number();
 
     read_cycle_count();
+}
+
+// read_block - returns number of characters read if successful, zero if unsuccessful
+uint8_t AP_BattMonitor_SMBus_Generic::read_block(uint8_t reg, uint8_t* data, bool append_zero) const
+{
+    // get length
+    uint8_t bufflen;
+    // read byte (first byte indicates the number of bytes in the block)
+    if (!_dev->read_registers(reg, &bufflen, 1)) {
+        return 0;
+    }
+
+    // sanity check length returned by smbus
+    if (bufflen == 0 || bufflen > SMBUS_READ_BLOCK_MAXIMUM_TRANSFER) {
+        return 0;
+    }
+
+    // buffer to hold results (2 extra byte returned holding length and PEC)
+    const uint8_t read_size = bufflen + 1 + (_pec_supported ? 1 : 0);
+    uint8_t buff[read_size];
+
+    // read bytes
+    if (!_dev->read_registers(reg, buff, read_size)) {
+        return 0;
+    }
+
+    // check PEC
+    if (_pec_supported) {
+        uint8_t pec = get_PEC(AP_BATTMONITOR_SMBUS_I2C_ADDR, reg, true, buff, bufflen+1);
+        if (pec != buff[bufflen+1]) {
+            return 0;
+        }
+    }
+
+    // copy data (excluding PEC)
+    memcpy(data, &buff[1], bufflen);
+
+    // optionally add zero to end
+    if (append_zero) {
+        data[bufflen] = '\0';
+    }
+
+    // return success
+    return bufflen;
 }
 
 // check if PEC supported with the version value in SpecificationInfo() function
@@ -153,8 +200,8 @@ bool AP_BattMonitor_SMBus_Generic::check_pec_support()
     }
 
     // check manufacturer name
-    uint8_t buff[AP_BATTMONITOR_SMBUS_READ_BLOCK_MAXIMUM_TRANSFER + 1] {};
-    if (read_block(BATTMONITOR_SMBUS_MANUFACTURE_NAME, buff, sizeof(buff))) {
+    uint8_t buff[SMBUS_READ_BLOCK_MAXIMUM_TRANSFER + 1];
+    if (read_block(BATTMONITOR_SMBUS_MANUFACTURE_NAME, buff, true)) {
         // Hitachi maxell batteries do not support PEC
         if (strcmp((char*)buff, "Hitachi maxell") == 0) {
             _pec_supported = false;
@@ -168,3 +215,4 @@ bool AP_BattMonitor_SMBus_Generic::check_pec_support()
 	_pec_confirmed = true;
 	return true;
 }
+

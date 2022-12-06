@@ -22,8 +22,9 @@
 
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
+#include <AP_Mission/AP_Mission.h>
 #include <inttypes.h>
-#include <AP_Common/Location.h>
+
 
 class AP_AdvancedFailsafe
 {
@@ -47,10 +48,12 @@ public:
     };
 
     /* Do not allow copies */
-    CLASS_NO_COPY(AP_AdvancedFailsafe);
+    AP_AdvancedFailsafe(const AP_AdvancedFailsafe &other) = delete;
+    AP_AdvancedFailsafe &operator=(const AP_AdvancedFailsafe&) = delete;
 
     // Constructor
-    AP_AdvancedFailsafe()
+    AP_AdvancedFailsafe(AP_Mission &_mission) :
+        mission(_mission)
         {
             AP_Param::setup_object_defaults(this, var_info);
             if (_singleton != nullptr) {
@@ -72,7 +75,7 @@ public:
     bool enabled() { return _enable; }
 
     // check that everything is OK
-    void check(uint32_t last_valid_rc_ms);
+    void check(bool geofence_breached, uint32_t last_valid_rc_ms);
 
     // generate heartbeat msgs, so external failsafe boards are happy
     // during sensor calibration
@@ -102,6 +105,8 @@ protected:
     virtual enum control_mode afs_mode(void) = 0;
 
     enum state _state;
+
+    AP_Mission &mission;
 
     AP_Int8 _enable;
     // digital output pins for communicating with the failsafe board

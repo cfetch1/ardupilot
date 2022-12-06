@@ -20,8 +20,6 @@
  */
 #include "AP_RangeFinder_VL53L0X.h"
 
-#if AP_RANGEFINDER_VL53L0X_ENABLED
-
 #include <utility>
 
 #include <AP_HAL/AP_HAL.h>
@@ -764,7 +762,7 @@ uint16_t AP_RangeFinder_VL53L0X::read_register16(uint8_t reg)
 void AP_RangeFinder_VL53L0X::update(void)
 {
     if (counter > 0) {
-        state.distance_m = (sum_mm * 0.001f) / counter;
+        state.distance_cm = sum_mm / (10*counter);
         state.last_reading_ms = AP_HAL::millis();
         sum_mm = 0;
         counter = 0;
@@ -782,5 +780,3 @@ void AP_RangeFinder_VL53L0X::timer(void)
         counter++;
     }
 }
-
-#endif  // AP_RANGEFINDER_VL53L0X_ENABLED

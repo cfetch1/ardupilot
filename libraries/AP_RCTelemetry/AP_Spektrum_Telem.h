@@ -14,7 +14,7 @@
 */
 #pragma once
 
-#include <AP_HAL/AP_HAL_Boards.h>
+#include <AP_HAL/AP_HAL.h>
 
 #ifndef HAL_SPEKTRUM_TELEM_ENABLED
 #define HAL_SPEKTRUM_TELEM_ENABLED !HAL_MINIMIZE_FEATURES
@@ -22,6 +22,8 @@
 
 #if HAL_SPEKTRUM_TELEM_ENABLED
 
+#include <AP_Notify/AP_Notify.h>
+#include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_HAL/utility/RingBuffer.h>
 #include "AP_RCTelemetry.h"
 
@@ -49,7 +51,8 @@ public:
     ~AP_Spektrum_Telem() override;
 
     /* Do not allow copies */
-    CLASS_NO_COPY(AP_Spektrum_Telem);
+    AP_Spektrum_Telem(const AP_Spektrum_Telem &other) = delete;
+    AP_Spektrum_Telem &operator=(const AP_Spektrum_Telem&) = delete;
 
     // init - perform required initialisation
     virtual bool init() override;

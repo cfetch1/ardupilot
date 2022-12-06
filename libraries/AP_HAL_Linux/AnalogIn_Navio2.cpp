@@ -42,16 +42,15 @@ AnalogSource_Navio2::AnalogSource_Navio2(uint8_t pin)
     set_channel(pin);
 }
 
-bool AnalogSource_Navio2::set_pin(uint8_t pin)
+void AnalogSource_Navio2::set_pin(uint8_t pin)
 {
     if (_pin == pin) {
-        return true;
+        return;
     }
 
     set_channel(pin);
 
     _pin = pin;
-    return true;
 }
 
 float AnalogSource_Navio2::read_average()

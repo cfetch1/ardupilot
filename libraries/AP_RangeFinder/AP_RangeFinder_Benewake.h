@@ -1,13 +1,6 @@
 #pragma once
 
 #include "AP_RangeFinder.h"
-
-#ifndef AP_RANGEFINDER_BENEWAKE_ENABLED
-#define AP_RANGEFINDER_BENEWAKE_ENABLED AP_RANGEFINDER_ENABLED
-#endif
-
-#if AP_RANGEFINDER_BENEWAKE_ENABLED
-
 #include "AP_RangeFinder_Backend_Serial.h"
 
 class AP_RangeFinder_Benewake : public AP_RangeFinder_Backend_Serial
@@ -29,11 +22,9 @@ protected:
 private:
 
     // get a reading
-    // distance returned in reading_m
-    bool get_reading(float &reading_m) override;
+    // distance returned in reading_cm
+    bool get_reading(uint16_t &reading_cm) override;
 
     uint8_t linebuf[10];
     uint8_t linebuf_len;
 };
-
-#endif  // AP_RANGEFINDER_BENEWAKE_ENABLED

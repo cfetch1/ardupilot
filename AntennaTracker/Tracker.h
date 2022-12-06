@@ -27,6 +27,7 @@
 #include <stdio.h>
 
 #include <AP_Common/AP_Common.h>
+#include <AP_HAL/AP_HAL.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Math/AP_Math.h>        // ArduPilot Mega Vector/Matrix math Library
 #include <AP_AHRS/AP_AHRS.h>         // ArduPilot Mega DCM Library
@@ -37,7 +38,6 @@
 #include <AP_NavEKF2/AP_NavEKF2.h>
 #include <AP_NavEKF3/AP_NavEKF3.h>
 
-#include <SRV_Channel/SRV_Channel.h>
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_Mission/AP_Mission.h>
 #include <AP_Stats/AP_Stats.h>                      // statistics library
@@ -54,8 +54,12 @@
 
 #include "AP_Arming.h"
 
-#if AP_SCRIPTING_ENABLED
+#ifdef ENABLE_SCRIPTING
 #include <AP_Scripting/AP_Scripting.h>
+#endif
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#include <SITL/SITL.h>
 #endif
 
 #include "mode.h"
@@ -81,6 +85,10 @@ private:
 
     AP_Logger logger;
 
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    SITL::SITL sitl;
+#endif
+    
     /**
        antenna control channels
     */
@@ -116,7 +124,7 @@ private:
     ModeServoTest mode_servotest;
     ModeStop mode_stop;
 
-#if AP_SCRIPTING_ENABLED
+#ifdef ENABLE_SCRIPTING
     AP_Scripting scripting;
 #endif
 
@@ -186,6 +194,7 @@ private:
     void update_ahrs();
     void compass_save();
     void update_compass(void);
+    void accel_cal_update(void);
     void update_GPS(void);
     void handle_battery_failsafe(const char* type_str, const int8_t action);
 
@@ -223,7 +232,6 @@ private:
     void tracking_update_pressure(const mavlink_scaled_pressure_t &msg);
     void tracking_manual_control(const mavlink_manual_control_t &msg);
     void update_armed_disarmed() const;
-    bool get_pan_tilt_norm(float &pan_norm, float &tilt_norm) const override;
 
     // Arming/Disarming management class
     AP_Arming_Tracker arming;

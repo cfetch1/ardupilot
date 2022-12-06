@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from xml.sax.saxutils import escape, quoteattr
 
 from emit import Emit

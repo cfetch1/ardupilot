@@ -1,9 +1,6 @@
 #pragma once
 
 #include "AP_Compass.h"
-
-#if AP_COMPASS_UAVCAN_ENABLED
-
 #include "AP_Compass_Backend.h"
 
 #include <AP_UAVCAN/AP_UAVCAN.h>
@@ -49,5 +46,3 @@ private:
 
     static HAL_Semaphore _sem_registry;
 };
-
-#endif  // AP_COMPASS_UAVCAN_ENABLED

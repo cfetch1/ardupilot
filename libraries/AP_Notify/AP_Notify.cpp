@@ -46,23 +46,12 @@ AP_Notify *AP_Notify::_singleton;
 
 #define CONFIG_NOTIFY_DEVICES_MAX 6
 
-#if AP_NOTIFY_TOSHIBALED_ENABLED
 #define TOSHIBA_LED_I2C_BUS_INTERNAL    0
 #define TOSHIBA_LED_I2C_BUS_EXTERNAL    1
-#define ALL_TOSHIBALED_I2C (Notify_LED_ToshibaLED_I2C_Internal | Notify_LED_ToshibaLED_I2C_External)
-#else
-#define ALL_TOSHIBALED_I2C 0
-#endif
-
-#if AP_NOTIFY_NCP5623_ENABLED
-#define ALL_NCP5623_I2C (Notify_LED_NCP5623_I2C_Internal | Notify_LED_NCP5623_I2C_External)
-#else
-#define ALL_NCP5623_I2C 0
-#endif
 
 // all I2C_LEDS
-#define I2C_LEDS (ALL_TOSHIBALED_I2C | ALL_NCP5623_I2C)
-
+#define I2C_LEDS (Notify_LED_ToshibaLED_I2C_Internal | Notify_LED_ToshibaLED_I2C_External | \
+                  Notify_LED_NCP5623_I2C_Internal | Notify_LED_NCP5623_I2C_External)
 
 #ifndef BUILD_DEFAULT_LED_TYPE
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
@@ -134,15 +123,6 @@ AP_Notify *AP_Notify::_singleton;
 #define NOTIFY_LED_LEN_DEFAULT 1
 #endif
 
-#ifndef HAL_BUZZER_PIN
-#define HAL_BUZZER_PIN -1
-#endif
-
-#ifndef HAL_BUZZER_ON
-#define HAL_BUZZER_ON 1
-#define HAL_BUZZER_OFF 0
-#endif
-
 // table of user settable parameters
 const AP_Param::GroupInfo AP_Notify::var_info[] = {
 
@@ -156,7 +136,7 @@ const AP_Param::GroupInfo AP_Notify::var_info[] = {
     // @Param: BUZZ_TYPES
     // @DisplayName: Buzzer Driver Types
     // @Description: Controls what types of Buzzer will be enabled
-    // @Bitmask: 0:Built-in buzzer, 1:DShot, 2:DroneCAN
+    // @Bitmask: 0:Built-in buzzer, 1:DShot, 2:UAVCAN
     // @User: Advanced
     AP_GROUPINFO("BUZZ_TYPES", 1, AP_Notify, _buzzer_type, BUILD_DEFAULT_BUZZER_TYPE),
 
@@ -176,7 +156,7 @@ const AP_Param::GroupInfo AP_Notify::var_info[] = {
     AP_GROUPINFO("DISPLAY_TYPE", 3, AP_Notify, _display_type, 0),
 #endif
 
-#if AP_NOTIFY_OREOLED_ENABLED
+#if HAL_OREO_LED_ENABLED
     // @Param: OREO_THEME
     // @DisplayName: OreoLED Theme
     // @Description: Enable/Disable Solo Oreo LED driver, 0 to disable, 1 for Aircraft theme, 2 for Rover theme
@@ -185,26 +165,30 @@ const AP_Param::GroupInfo AP_Notify::var_info[] = {
     AP_GROUPINFO("OREO_THEME", 4, AP_Notify, _oreo_theme, 0),
 #endif
 
+#if !defined(HAL_BUZZER_PIN)
     // @Param: BUZZ_PIN
     // @DisplayName: Buzzer pin
-    // @Description: Enables to connect active buzzer to arbitrary pin. Requires 3-pin buzzer or additional MOSFET! Some the Wiki's "GPIOs" page for how to determine the pin number for a given autopilot.
-    // @Values: -1:Disabled
+    // @Description: Enables to connect active buzzer to arbitrary pin. Requires 3-pin buzzer or additional MOSFET!
+    // @Values: 0:Disabled
     // @User: Advanced
-    AP_GROUPINFO("BUZZ_PIN", 5, AP_Notify, _buzzer_pin, HAL_BUZZER_PIN),
+    AP_GROUPINFO("BUZZ_PIN", 5, AP_Notify, _buzzer_pin, 0),
+#endif
 
     // @Param: LED_TYPES
     // @DisplayName: LED Driver Types
     // @Description: Controls what types of LEDs will be enabled
-    // @Bitmask: 0:Built-in LED, 1:Internal ToshibaLED, 2:External ToshibaLED, 3:External PCA9685, 4:Oreo LED, 5:DroneCAN, 6:NCP5623 External, 7:NCP5623 Internal, 8:NeoPixel, 9:ProfiLED, 10:Scripting, 11:DShot, 12:ProfiLED_SPI
+    // @Bitmask: 0:Built-in LED, 1:Internal ToshibaLED, 2:External ToshibaLED, 3:External PCA9685, 4:Oreo LED, 5:UAVCAN, 6:NCP5623 External, 7:NCP5623 Internal, 8:NeoPixel, 9:ProfiLED, 10:Scripting, 11:DShot
     // @User: Advanced
     AP_GROUPINFO("LED_TYPES", 6, AP_Notify, _led_type, BUILD_DEFAULT_LED_TYPE),
 
+#if !defined(HAL_BUZZER_PIN)
     // @Param: BUZZ_ON_LVL
     // @DisplayName: Buzzer-on pin logic level
     // @Description: Specifies pin level that indicates buzzer should play
     // @Values: 0:LowIsOn,1:HighIsOn
     // @User: Advanced
-    AP_GROUPINFO("BUZZ_ON_LVL", 7, AP_Notify, _buzzer_level, HAL_BUZZER_ON),
+    AP_GROUPINFO("BUZZ_ON_LVL", 7, AP_Notify, _buzzer_level, 1),
+#endif
 
     // @Param: BUZZ_VOLUME
     // @DisplayName: Buzzer volume
@@ -300,15 +284,13 @@ void AP_Notify::add_backends(void)
                 ADD_BACKEND(new AP_BoardLED2());
 #endif
                 break;
-#if AP_NOTIFY_TOSHIBALED_ENABLED
             case Notify_LED_ToshibaLED_I2C_Internal:
                 ADD_BACKEND(new ToshibaLED_I2C(TOSHIBA_LED_I2C_BUS_INTERNAL));
                 break;
             case Notify_LED_ToshibaLED_I2C_External:
                 ADD_BACKEND(new ToshibaLED_I2C(TOSHIBA_LED_I2C_BUS_EXTERNAL));
                 break;
-#endif
-#if AP_NOTIFY_NCP5623_ENABLED
+#if !HAL_MINIMIZE_FEATURES
             case Notify_LED_NCP5623_I2C_External:
                 FOREACH_I2C_EXTERNAL(b) {
                     ADD_BACKEND(new NCP5623(b));
@@ -320,22 +302,17 @@ void AP_Notify::add_backends(void)
                 }
                 break;
 #endif
-#if AP_NOTIFY_PCA9685_ENABLED
             case Notify_LED_PCA9685LED_I2C_External:
                 ADD_BACKEND(new PCA9685LED_I2C());
                 break;
-#endif
             case Notify_LED_NeoPixel:
                 ADD_BACKEND(new NeoPixel());
                 break;
             case Notify_LED_ProfiLED:
                 ADD_BACKEND(new ProfiLED());
                 break;
-            case Notify_LED_ProfiLED_SPI:
-                ADD_BACKEND(new ProfiLED_SPI());
-                break;
             case Notify_LED_OreoLED:
-#if AP_NOTIFY_OREOLED_ENABLED
+#if HAL_OREO_LED_ENABLED
                 if (_oreo_theme) {
                     ADD_BACKEND(new OreoLED_I2C(0, _oreo_theme));
                 }
@@ -348,7 +325,7 @@ void AP_Notify::add_backends(void)
                 break;
 
             case Notify_LED_Scripting:
-#if AP_SCRIPTING_ENABLED
+#ifdef ENABLE_SCRIPTING
                 ADD_BACKEND(new ScriptingLED());
 #endif
                 break;
@@ -369,7 +346,7 @@ void AP_Notify::add_backends(void)
 // ChibiOS noise makers
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
     ADD_BACKEND(new Buzzer());
-#if HAL_PWM_COUNT > 0 || HAL_DSHOT_ALARM_ENABLED
+#if defined(HAL_PWM_ALARM) || HAL_DSHOT_ALARM
     ADD_BACKEND(new AP_ToneAlarm());
 #endif
 
@@ -427,7 +404,6 @@ void AP_Notify::update(void)
     memset(&AP_Notify::events, 0, sizeof(AP_Notify::events));
 }
 
-#if AP_NOTIFY_MAVLINK_LED_CONTROL_SUPPORT_ENABLED
 // handle a LED_CONTROL message
 void AP_Notify::handle_led_control(const mavlink_message_t &msg)
 {
@@ -437,7 +413,6 @@ void AP_Notify::handle_led_control(const mavlink_message_t &msg)
         }
     }
 }
-#endif
 
 // handle RGB from Scripting or AP_Periph
 void AP_Notify::handle_rgb(uint8_t r, uint8_t g, uint8_t b, uint8_t rate_hz)
@@ -449,12 +424,12 @@ void AP_Notify::handle_rgb(uint8_t r, uint8_t g, uint8_t b, uint8_t rate_hz)
     }
 }
 
-// handle RGB Per led from Scripting
-void AP_Notify::handle_rgb_id(uint8_t r, uint8_t g, uint8_t b, uint8_t id)
+// handle a PLAY_TUNE message
+void AP_Notify::handle_play_tune(const mavlink_message_t &msg)
 {
     for (uint8_t i = 0; i < _num_devices; i++) {
         if (_devices[i] != nullptr) {
-            _devices[i]->rgb_set_id(r, g, b, id);
+            _devices[i]->handle_play_tune(msg);
         }
     }
 }

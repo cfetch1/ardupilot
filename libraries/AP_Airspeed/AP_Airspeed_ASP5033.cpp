@@ -19,9 +19,6 @@
  */
 
 #include "AP_Airspeed_ASP5033.h"
-
-#if AP_AIRSPEED_ASP5033_ENABLED
-
 #include <AP_HAL/I2CDevice.h>
 
 extern const AP_HAL::HAL &hal;
@@ -56,9 +53,6 @@ bool AP_Airspeed_ASP5033::init()
         if (!confirm_sensor_id()) {
             continue;
         }
-
-        dev->set_device_type(uint8_t(DevType::ASP5033));
-        set_bus_id(dev->get_bus_id());
 
         dev->register_periodic_callback(1000000UL/80U,
                                         FUNCTOR_BIND_MEMBER(&AP_Airspeed_ASP5033::timer, void));
@@ -177,5 +171,3 @@ bool AP_Airspeed_ASP5033::get_temperature(float &temperature)
 
     return true;
 }
-
-#endif

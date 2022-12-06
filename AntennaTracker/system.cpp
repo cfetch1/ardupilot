@@ -27,18 +27,14 @@ void Tracker::init_ardupilot()
 
     // setup telem slots with serial ports
     gcs().setup_uarts();
-    // update_send so that if the first packet we receive happens to
-    // be an arm message we don't trigger an internal error when we
-    // try to initialise stream rates in the main loop.
-    gcs().update_send();
 
 #if LOGGING_ENABLED == ENABLED
     log_init();
 #endif
 
-#if AP_SCRIPTING_ENABLED
+#ifdef ENABLE_SCRIPTING
     scripting.init();
-#endif // AP_SCRIPTING_ENABLED
+#endif // ENABLE_SCRIPTING
 
     // initialise compass
     AP::compass().set_log_bit(MASK_LOG_COMPASS);
@@ -63,7 +59,6 @@ void Tracker::init_ardupilot()
     serial_manager.set_blocking_writes_all(false);
 
     // initialise rc channels including setting mode
-    rc().convert_options(RC_Channel::AUX_FUNC::ARMDISARM_UNUSED, RC_Channel::AUX_FUNC::ARMDISARM);
     rc().init();
 
     // initialise servos

@@ -1,24 +1,9 @@
 name: test rover
 
-on: 
-  push:
-    paths-ignore: # ignore vehicle only changes not for rover
-      - 'AntennaTracker/**'
-      - 'ArduPlane/**'
-      - 'ArduSub/**'
-      - 'Blimp/**'
-      - 'ArduCopter/**'
-
-  pull_request:
-    paths-ignore: # ignore vehicle only changes not for rover
-      - 'AntennaTracker/**'
-      - 'ArduPlane/**'
-      - 'ArduSub/**'
-      - 'Blimp/**'
-      - 'ArduCopter/**'
-
-  workflow_dispatch:
-
+on: [push, pull_request, workflow_dispatch]
+# paths:
+# - "*"
+# - "!README.md" <-- don't rebuild on doc change
 concurrency:
   group: ci-${{github.workflow}}-${{ github.ref }}
   cancel-in-progress: true
@@ -53,13 +38,19 @@ jobs:
           restore-keys: ${{github.workflow}}-ccache-${{ matrix.toolchain }}-  # restore ccache from either previous build on this branch or on master
       - name: setup ccache
         run: |
-          . .github/workflows/ccache.env
+          mkdir -p ~/.ccache
+          echo "base_dir = ${GITHUB_WORKSPACE}" > ~/.ccache/ccache.conf
+          echo "compression = true" >> ~/.ccache/ccache.conf
+          echo "compression_level = 6" >> ~/.ccache/ccache.conf
+          echo "max_size = 400M" >> ~/.ccache/ccache.conf
+          ccache -s
+          ccache -z
       - name: build rover ${{ matrix.toolchain }}
         shell: bash
         run: |
-          if [[ ${{ matrix.toolchain }} == "clang" ]]; then
-            export CC=clang
-            export CXX=clang++
+          if [[ ${{ matrix.toolchain }} = "clang" ]]; then
+            export CC=clang-7
+            export CXX=clang++-7
           fi
           PATH="/github/home/.local/bin:$PATH"
           ./waf configure --board sitl
@@ -78,7 +69,6 @@ jobs:
       matrix:
         config: [
             sitltest-rover,
-            sitltest-sailboat,
             sitltest-balancebot
         ]
 
@@ -101,7 +91,13 @@ jobs:
           restore-keys: ${{github.workflow}}-ccache-base-  # restore ccache from either previous build on this branch or on master
       - name: setup ccache
         run: |
-          . .github/workflows/ccache.env
+          mkdir -p ~/.ccache
+          echo "base_dir = ${GITHUB_WORKSPACE}" > ~/.ccache/ccache.conf
+          echo "compression = true" >> ~/.ccache/ccache.conf
+          echo "compression_level = 6" >> ~/.ccache/ccache.conf
+          echo "max_size = 400M" >> ~/.ccache/ccache.conf
+          ccache -s
+          ccache -z
       - name: test ${{matrix.config}}
         env:
           CI_BUILD_TARGET: ${{matrix.config}}
@@ -118,10 +114,6 @@ jobs:
            path: |
              /tmp/buildlogs
              /__w/ardupilot/ardupilot/logs
-             /__w/ardupilot/ardupilot/ap-*.core
-             /__w/ardupilot/ardupilot/core.*
-             /__w/ardupilot/ardupilot/dumpstack.sh_*
-             /__w/ardupilot/ardupilot/dumpcore.sh_*
            retention-days: 14
 
       - name: Archive .bin artifacts

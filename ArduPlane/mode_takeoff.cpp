@@ -44,8 +44,7 @@ const AP_Param::GroupInfo ModeTakeoff::var_info[] = {
     AP_GROUPEND
 };
 
-ModeTakeoff::ModeTakeoff() :
-    Mode()
+ModeTakeoff::ModeTakeoff()
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
@@ -66,7 +65,7 @@ void ModeTakeoff::update()
             plane.prev_WP_loc = plane.current_loc;
             plane.next_WP_loc = plane.current_loc;
             takeoff_started = true;
-            plane.set_flight_stage(AP_FixedWing::FlightStage::NORMAL);
+            plane.set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_NORMAL);
         }
     }
 
@@ -87,7 +86,7 @@ void ModeTakeoff::update()
 
         plane.auto_state.takeoff_pitch_cd = level_pitch * 100;
 
-        plane.set_flight_stage(AP_FixedWing::FlightStage::TAKEOFF);
+        plane.set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_TAKEOFF);
 
         if (!plane.throttle_suppressed) {
             gcs().send_text(MAV_SEVERITY_INFO, "Takeoff to %.0fm at %.1fm to %.1f deg",
@@ -99,7 +98,7 @@ void ModeTakeoff::update()
     // we finish the initial level takeoff if we climb past
     // TKOFF_LVL_ALT or we pass the target location. The check for
     // target location prevents us flying forever if we can't climb
-    if (plane.flight_stage == AP_FixedWing::FlightStage::TAKEOFF &&
+    if (plane.flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF &&
         (plane.current_loc.alt - start_loc.alt >= level_alt*100 ||
          start_loc.get_distance(plane.current_loc) >= target_dist)) {
         // reached level alt, re-calculate bearing to cope with systems with no compass
@@ -112,15 +111,15 @@ void ModeTakeoff::update()
         plane.next_WP_loc.offset_bearing(direction, MAX(dist-dist_done, 0));
         plane.next_WP_loc.alt = start_loc.alt + target_alt*100.0;
 
-        plane.set_flight_stage(AP_FixedWing::FlightStage::NORMAL);
+        plane.set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_NORMAL);
         
-#if AP_FENCE_ENABLED
+#if AC_FENCE == ENABLED
         plane.fence.auto_enable_fence_after_takeoff();
 #endif
     }
 
-    if (plane.flight_stage == AP_FixedWing::FlightStage::TAKEOFF) {
-        SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 100.0);
+    if (plane.flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF) {
+        SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 100);
         plane.takeoff_calc_roll();
         plane.takeoff_calc_pitch();
     } else {

@@ -11,12 +11,6 @@
 #include <limits.h>
 #include <stddef.h>
 
-/*
-  don't support binary load() by default
- */
-#ifndef LUA_SUPPORT_LOAD_BINARY
-#define LUA_SUPPORT_LOAD_BINARY 0
-#endif
 
 /*
 ** ===================================================================

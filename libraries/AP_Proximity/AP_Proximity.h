@@ -14,7 +14,12 @@
  */
 #pragma once
 
-#include "AP_Proximity_config.h"
+#include <AP_HAL/AP_HAL.h>
+#include <AP_HAL/AP_HAL_Boards.h>
+
+#ifndef HAL_PROXIMITY_ENABLED
+#define HAL_PROXIMITY_ENABLED (!HAL_MINIMIZE_FEATURES && BOARD_FLASH_SIZE > 1024)
+#endif
 
 #if HAL_PROXIMITY_ENABLED
 
@@ -22,10 +27,10 @@
 #include <AP_Param/AP_Param.h>
 #include <AP_Math/AP_Math.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
-#include "AP_Proximity_Params.h"
-#include "AP_Proximity_Boundary_3D.h"
 
-#define PROXIMITY_MAX_INSTANCES             3   // Maximum number of proximity sensor instances available on this platform
+#define PROXIMITY_MAX_INSTANCES             1   // Maximum number of proximity sensor instances available on this platform
+#define PROXIMITY_MAX_IGNORE                6   // up to six areas can be ignored
+#define PROXIMITY_MAX_DIRECTION 8
 #define PROXIMITY_SENSOR_ID_START 10
 
 class AP_Proximity_Backend;
@@ -37,13 +42,13 @@ public:
 
     AP_Proximity();
 
-    /* Do not allow copies */
-    CLASS_NO_COPY(AP_Proximity);
+    AP_Proximity(const AP_Proximity &other) = delete;
+    AP_Proximity &operator=(const AP_Proximity) = delete;
 
     // Proximity driver types
     enum class Type {
         None    = 0,
-        // 1 was SF40C_v09
+        SF40C_v09 = 1,
         MAV     = 2,
         TRTOWER = 3,
         RangeFinder = 4,
@@ -55,7 +60,6 @@ public:
         SITL    = 10,
         AirSimSITL = 12,
 #endif
-        CYGBOT_D1 = 13,
     };
 
     enum class Status {
@@ -64,45 +68,50 @@ public:
         Good
     };
 
+    // structure holding distances in PROXIMITY_MAX_DIRECTION directions. used for sending distances to ground station
+    struct Proximity_Distance_Array {
+        uint8_t orientation[PROXIMITY_MAX_DIRECTION]; // orientation (i.e. rough direction) of the distance (see MAV_SENSOR_ORIENTATION)
+        float distance[PROXIMITY_MAX_DIRECTION];      // distance in meters
+        bool valid(uint8_t offset) const {
+            // returns true if the distance stored at offset is valid
+            return (offset < 8 && (offset_valid & (1U<<offset)));
+        };
+
+        uint8_t offset_valid; // bitmask
+    };
+
     // detect and initialise any available proximity sensors
-    void init();
+    void init(void);
 
     // update state of all proximity sensors. Should be called at high rate from main loop
-    void update();
+    void update(void);
 
-    // return the number of proximity sensor backends
-    uint8_t num_sensors() const { return num_instances; }
-
-    // return sensor type of a given instance
-    Type get_type(uint8_t instance) const;
-
-    // return distance filter frequency
+    // return sensor orientation and yaw correction
+    uint8_t get_orientation(uint8_t instance) const;
+    int16_t get_yaw_correction(uint8_t instance) const;
     float get_filter_freq() const { return _filt_freq; }
 
     // return sensor health
-    Status get_instance_status(uint8_t instance) const;
+    Status get_status(uint8_t instance) const;
     Status get_status() const;
 
-    // prearm checks
-    bool prearm_healthy(char *failure_msg, const uint8_t failure_msg_len) const;
-
-    // get maximum and minimum distances (in meters)
-    float distance_max() const;
-    float distance_min() const;
-
-    //
-    // 3D boundary related methods
-    //
+    // Return the number of proximity sensors
+    uint8_t num_sensors(void) const {
+        return num_instances;
+    }
 
     // get distances in PROXIMITY_MAX_DIRECTION directions. used for sending distances to ground station
     bool get_horizontal_distances(Proximity_Distance_Array &prx_dist_array) const;
 
+    // get raw and filtered distances in 8 directions per layer. used for logging
+    bool get_active_layer_distances(uint8_t layer, AP_Proximity::Proximity_Distance_Array &prx_dist_array, AP_Proximity::Proximity_Distance_Array &prx_filt_dist_array) const;
+
     // get total number of obstacles, used in GPS based Simple Avoidance
     uint8_t get_obstacle_count() const;
-
+    
     // get vector to obstacle based on obstacle_num passed, used in GPS based Simple Avoidance
     bool get_obstacle(uint8_t obstacle_num, Vector3f& vec_to_obstacle) const;
-
+    
     // returns shortest distance to "obstacle_num" obstacle, from a line segment formed between "seg_start" and "seg_end"
     // returns FLT_MAX if it's an invalid instance.
     bool closest_point_from_segment_to_obstacle(uint8_t obstacle_num, const Vector3f& seg_start, const Vector3f& seg_end, Vector3f& closest_point) const;
@@ -111,83 +120,78 @@ public:
     //   returns true on success, false if no valid readings
     bool get_closest_object(float& angle_deg, float &distance) const;
 
-    // get number of objects
+    // get number of objects, angle and distance - used for non-GPS avoidance
     uint8_t get_object_count() const;
     bool get_object_angle_and_distance(uint8_t object_number, float& angle_deg, float &distance) const;
 
-    //
-    // mavlink related methods
-    //
+    // get number of layers
+    uint8_t get_num_layers() const;
 
-    // handle mavlink messages
+    // get maximum and minimum distances (in meters) of primary sensor
+    float distance_max() const;
+    float distance_min() const;
+
+    // handle mavlink DISTANCE_SENSOR messages
     void handle_msg(const mavlink_message_t &msg);
 
-    // methods for mavlink SYS_STATUS message (send_sys_status)
-    bool sensor_present() const;
-    bool sensor_enabled() const;
-    bool sensor_failed() const;
+    // The Proximity_State structure is filled in by the backend driver
+    struct Proximity_State {
+        uint8_t                 instance;   // the instance number of this proximity sensor
+        Status   status;     // sensor status
+    };
 
     //
-    // support for upwards and downwards facing sensors
+    // support for upward facing sensors
     //
 
     // get distance upwards in meters. returns true on success
     bool get_upward_distance(uint8_t instance, float &distance) const;
     bool get_upward_distance(float &distance) const;
 
-    // set alt as read from downward facing rangefinder. Tilt is already adjusted for
-    void set_rangefinder_alt(bool use, bool healthy, float alt_cm);
+    Type get_type(uint8_t instance) const;
 
-    // method called by vehicle to have AP_Proximity write onboard log messages
-    void log();
-
-    // The Proximity_State structure is filled in by the backend driver
-    struct Proximity_State {
-        uint8_t instance;   // the instance number of this proximity sensor
-        Status status;      // sensor status
-    };
+    // true if raw distances should be logged
+    bool get_raw_log_enable() const { return _raw_log_enable; }
 
     // parameter list
     static const struct AP_Param::GroupInfo var_info[];
 
     static AP_Proximity *get_singleton(void) { return _singleton; };
 
-    // 3D boundary
-    AP_Proximity_Boundary_3D boundary;
+    // methods for mavlink SYS_STATUS message (send_sys_status)
+    // these methods cover only the primary instance
+    bool sensor_present() const;
+    bool sensor_enabled() const;
+    bool sensor_failed() const;
 
-    // Check if Obstacle defined by body-frame yaw and pitch is near ground
-    bool check_obstacle_near_ground(float pitch, float yaw, float distance) const;
-
-protected:
-
-    // parameters for backends
-    AP_Proximity_Params params[PROXIMITY_MAX_INSTANCES];
+    // set alt as read from downward facing rangefinder. Tilt is already adjusted for
+    void set_rangefinder_alt(bool use, bool healthy, float alt_cm);
 
 private:
     static AP_Proximity *_singleton;
     Proximity_State state[PROXIMITY_MAX_INSTANCES];
     AP_Proximity_Backend *drivers[PROXIMITY_MAX_INSTANCES];
+    uint8_t primary_instance;
     uint8_t num_instances;
 
-    // return true if the given instance exists
-    bool valid_instance(uint8_t i) const;
+    bool valid_instance(uint8_t i) const {
+        if (drivers[i] == nullptr) {
+            return false;
+        }
+        return (Type)_type[i].get() != Type::None;
+    }
 
     // parameters for all instances
-    AP_Int8 _raw_log_enable;                           // enable logging raw distances
+    AP_Int8  _type[PROXIMITY_MAX_INSTANCES];
+    AP_Int8  _orientation[PROXIMITY_MAX_INSTANCES];
+    AP_Int16 _yaw_correction[PROXIMITY_MAX_INSTANCES];
+    AP_Int16 _ignore_angle_deg[PROXIMITY_MAX_IGNORE];   // angle (in degrees) of area that should be ignored by sensor (i.e. leg shows up)
+    AP_Int8 _ignore_width_deg[PROXIMITY_MAX_IGNORE];    // width of beam (in degrees) that should be ignored
+    AP_Int8 _raw_log_enable;                            // enable logging raw distances
     AP_Int8 _ign_gnd_enable;                           // true if land detection should be enabled
     AP_Float _filt_freq;                               // cutoff frequency for low pass filter
-    AP_Float _alt_min;                                 // Minimum altitude -in meters- below which proximity should not work.
 
-    // get alt from rangefinder in meters. This reading is corrected for vehicle tilt
-    bool get_rangefinder_alt(float &alt_m) const;
-
-    struct RangeFinderState {
-        bool use;                          // true if enabled
-        bool healthy;                      // true if we can trust the altitude from the rangefinder
-        int16_t alt_cm;                    // tilt compensated altitude (in cm) from rangefinder
-        uint32_t last_downward_update_ms;  // last update ms
-    } _rangefinder_state;
-
+    void detect_instance(uint8_t instance);
 };
 
 namespace AP {

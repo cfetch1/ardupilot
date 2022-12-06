@@ -1,6 +1,4 @@
 #include "AP_InertialSensor.h"
-
-#if HAL_INS_ENABLED
 #include <GCS_MAVLink/GCS.h>
 #include <AP_Logger/AP_Logger.h>
 
@@ -24,8 +22,8 @@ const AP_Param::GroupInfo AP_InertialSensor::BatchSampler::var_info[] = {
 
     // @Param: BAT_OPT
     // @DisplayName: Batch Logging Options Mask
-    // @Description: Options for the BatchSampler.
-    // @Bitmask: 0:Sensor-Rate Logging (sample at full sensor rate seen by AP), 1: Sample post-filtering, 2: Sample pre- and post-filter
+    // @Description: Options for the BatchSampler. Post-filter and sensor-rate logging cannot be used at the same time.
+    // @Bitmask: 0:Sensor-Rate Logging (sample at full sensor rate seen by AP), 1: Sample post-filtering
     // @User: Advanced
     AP_GROUPINFO("BAT_OPT",  3, AP_InertialSensor::BatchSampler, _batch_options_mask, 0),
 
@@ -56,10 +54,10 @@ void AP_InertialSensor::BatchSampler::init()
         return;
     }
 
-    _required_count.set(_required_count - (_required_count % 32)); // round down to nearest multiple of 32
+    _required_count -= _required_count % 32; // round down to nearest multiple of 32
 
     const uint32_t total_allocation = 3*_required_count*sizeof(uint16_t);
-    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "INS: alloc %u bytes for ISB (free=%u)", (unsigned int)total_allocation, (unsigned int)hal.util->available_memory());
+    gcs().send_text(MAV_SEVERITY_DEBUG, "INS: alloc %u bytes for ISB (free=%u)", (unsigned int)total_allocation, (unsigned int)hal.util->available_memory());
 
     data_x = (int16_t*)calloc(_required_count, sizeof(int16_t));
     data_y = (int16_t*)calloc(_required_count, sizeof(int16_t));
@@ -71,7 +69,7 @@ void AP_InertialSensor::BatchSampler::init()
         data_x = nullptr;
         data_y = nullptr;
         data_z = nullptr;
-        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Failed to allocate %u bytes for IMU batch sampling", (unsigned int)total_allocation);
+        gcs().send_text(MAV_SEVERITY_WARNING, "Failed to allocate %u bytes for IMU batch sampling", (unsigned int)total_allocation);
         return;
     }
 
@@ -90,13 +88,14 @@ void AP_InertialSensor::BatchSampler::periodic()
 
 void AP_InertialSensor::BatchSampler::update_doing_sensor_rate_logging()
 {
-    if (has_option(BATCH_OPT_POST_FILTER)) {
+    // We can't do post-filter sensor rate logging
+    if ((batch_opt_t)(_batch_options_mask.get()) & BATCH_OPT_POST_FILTER) {
         _doing_post_filter_logging = true;
+        _doing_sensor_rate_logging = false;
+        return;
     }
-    if (has_option(BATCH_OPT_PRE_POST_FILTER)) {
-        _doing_pre_post_filter_logging = true;
-    }
-    if (!has_option(BATCH_OPT_SENSOR_RATE)) {
+    _doing_post_filter_logging = false;
+    if (!((batch_opt_t)(_batch_options_mask.get()) & BATCH_OPT_SENSOR_RATE)) {
         _doing_sensor_rate_logging = false;
         return;
     }
@@ -120,7 +119,6 @@ void AP_InertialSensor::BatchSampler::rotate_to_next_sensor()
     if ((1U<<instance) > (uint8_t)_sensor_mask) {
         // should only ever happen if user resets _sensor_mask
         instance = 0;
-        post_filter = false;
     }
 
     if (type == IMU_SENSOR_TYPE_ACCEL) {
@@ -154,7 +152,6 @@ void AP_InertialSensor::BatchSampler::rotate_to_next_sensor()
             if (_sensor_mask & (1U<<i)) {
                 instance = i;
                 haveinstance = true;
-                post_filter = !post_filter;
                 break;
             }
         }
@@ -165,7 +162,6 @@ void AP_InertialSensor::BatchSampler::rotate_to_next_sensor()
         abort();
 #endif
         instance = 0;
-        post_filter = false;
         return;
     }
 
@@ -267,7 +263,6 @@ bool AP_InertialSensor::BatchSampler::should_log(uint8_t _instance, IMU_SENSOR_T
 
 void AP_InertialSensor::BatchSampler::sample(uint8_t _instance, AP_InertialSensor::IMU_SENSOR_TYPE _type, uint64_t sample_us, const Vector3f &_sample)
 {
-#if HAL_LOGGING_ENABLED
     if (!should_log(_instance, _type)) {
         return;
     }
@@ -280,6 +275,4 @@ void AP_InertialSensor::BatchSampler::sample(uint8_t _instance, AP_InertialSenso
     data_z[data_write_offset] = multiplier*_sample.z;
 
     data_write_offset++; // may unblock the reading process
-#endif
 }
-#endif //#if HAL_INS_ENABLED

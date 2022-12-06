@@ -2,7 +2,7 @@
 
 #include <AP_Generator/AP_Generator.h>
 
-#if HAL_GENERATOR_ENABLED
+#if GENERATOR_ENABLED
 
 #include "AP_BattMonitor.h"
 #include "AP_BattMonitor_Backend.h"

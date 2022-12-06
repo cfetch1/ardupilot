@@ -32,7 +32,7 @@ void AP_AHRS::Write_AHRS2() const
 }
 
 // Write AOA and SSA
-void AP_AHRS::Write_AOA_SSA(void) const
+void AP_AHRS::Write_AOA_SSA(void)
 {
     const struct log_AOA_SSA aoa_ssa{
         LOG_PACKET_HEADER_INIT(LOG_AOA_SSA_MSG),
@@ -58,17 +58,17 @@ void AP_AHRS::Write_Attitude(const Vector3f &targets) const
         yaw             : (uint16_t)wrap_360_cd(yaw_sensor),
         error_rp        : (uint16_t)(get_error_rp() * 100),
         error_yaw       : (uint16_t)(get_error_yaw() * 100),
-        active          : uint8_t(active_EKF_type()),
+        active          : get_active_AHRS_type(),
     };
     AP::logger().WriteBlock(&pkt, sizeof(pkt));
 }
 
-void AP_AHRS::Write_Origin(LogOriginType origin_type, const Location &loc) const
+void AP_AHRS::Write_Origin(uint8_t origin_type, const Location &loc) const
 {
     const struct log_ORGN pkt{
         LOG_PACKET_HEADER_INIT(LOG_ORGN_MSG),
         time_us     : AP_HAL::micros64(),
-        origin_type : (uint8_t)origin_type,
+        origin_type : origin_type,
         latitude    : loc.lat,
         longitude   : loc.lng,
         altitude    : loc.alt
@@ -80,11 +80,11 @@ void AP_AHRS::Write_Origin(LogOriginType origin_type, const Location &loc) const
 void AP_AHRS::Write_POS() const
 {
     Location loc;
-    if (!get_location(loc)) {
+    if (!get_position(loc)) {
         return;
     }
     float home, origin;
-    AP::ahrs().get_relative_position_D_home(home);
+    get_relative_position_D_home(home);
     const struct log_POS pkt{
         LOG_PACKET_HEADER_INIT(LOG_POS_MSG),
         time_us        : AP_HAL::micros64(),
@@ -93,29 +93,6 @@ void AP_AHRS::Write_POS() const
         alt            : loc.alt*1.0e-2f,
         rel_home_alt   : -home,
         rel_origin_alt : get_relative_position_D_origin(origin) ? -origin : AP::logger().quiet_nanf(),
-    };
-    AP::logger().WriteBlock(&pkt, sizeof(pkt));
-}
-
-// Write a packet for video stabilisation
-void AP_AHRS::write_video_stabilisation() const
-{
-    Quaternion current_attitude;
-    get_quat_body_to_ned(current_attitude);
-    Vector3f accel = get_accel() - get_accel_bias();
-    const struct log_Video_Stabilisation pkt {
-        LOG_PACKET_HEADER_INIT(LOG_VIDEO_STABILISATION_MSG),
-        time_us         : AP_HAL::micros64(),
-        gyro_x          : _gyro_estimate.x,
-        gyro_y          : _gyro_estimate.y,
-        gyro_z          : _gyro_estimate.z,
-        accel_x         : accel.x,
-        accel_y         : accel.y,
-        accel_z         : accel.z,
-        Q1              : current_attitude.q1,
-        Q2              : current_attitude.q2,
-        Q3              : current_attitude.q3,
-        Q4              : current_attitude.q4,
     };
     AP::logger().WriteBlock(&pkt, sizeof(pkt));
 }
@@ -134,7 +111,7 @@ void AP_AHRS_View::Write_AttitudeView(const Vector3f &targets) const
         yaw             : (uint16_t)wrap_360_cd(yaw_sensor),
         error_rp        : (uint16_t)(get_error_rp() * 100),
         error_yaw       : (uint16_t)(get_error_yaw() * 100),
-        active          : uint8_t(AP::ahrs().active_EKF_type()),
+        active          : AP::ahrs().get_active_AHRS_type(),
     };
     AP::logger().WriteBlock(&pkt, sizeof(pkt));
 }
@@ -145,37 +122,21 @@ void AP_AHRS_View::Write_Rate(const AP_Motors &motors, const AC_AttitudeControl 
 {
     const Vector3f &rate_targets = attitude_control.rate_bf_targets();
     const Vector3f &accel_target = pos_control.get_accel_target_cmss();
-    const auto timeus = AP_HAL::micros64();
     const struct log_Rate pkt_rate{
         LOG_PACKET_HEADER_INIT(LOG_RATE_MSG),
-        time_us         : timeus,
+        time_us         : AP_HAL::micros64(),
         control_roll    : degrees(rate_targets.x),
         roll            : degrees(get_gyro().x),
-        roll_out        : motors.get_roll()+motors.get_roll_ff(),
+        roll_out        : motors.get_roll(),
         control_pitch   : degrees(rate_targets.y),
         pitch           : degrees(get_gyro().y),
-        pitch_out       : motors.get_pitch()+motors.get_pitch_ff(),
+        pitch_out       : motors.get_pitch(),
         control_yaw     : degrees(rate_targets.z),
         yaw             : degrees(get_gyro().z),
-        yaw_out         : motors.get_yaw()+motors.get_yaw_ff(),
+        yaw_out         : motors.get_yaw(),
         control_accel   : (float)accel_target.z,
-        accel           : (float)(-(get_accel_ef().z + GRAVITY_MSS) * 100.0f),
+        accel           : (float)(-(get_accel_ef_blended().z + GRAVITY_MSS) * 100.0f),
         accel_out       : motors.get_throttle()
     };
     AP::logger().WriteBlock(&pkt_rate, sizeof(pkt_rate));
-
-    /*
-      log P gain scale if not == 1.0
-     */
-    const Vector3f &scale = attitude_control.get_angle_P_scale_logging();
-    if (!is_equal(scale.x,1.0f) || !is_equal(scale.y,1.0f) || !is_equal(scale.z,1.0f)) {
-        const struct log_ATSC pkt_ATSC {
-            LOG_PACKET_HEADER_INIT(LOG_ATSC_MSG),
-            time_us  : timeus,
-            scaleP_x : scale.x,
-            scaleP_y : scale.y,
-            scaleP_z : scale.z,
-        };
-        AP::logger().WriteBlock(&pkt_ATSC, sizeof(pkt_ATSC));
-    }
 }

@@ -21,10 +21,6 @@ mcu = {
     ],
 
     'EXPECTED_CLOCK' : 168000000,
-
-    'DEFINES' : {
-        'STM32G4' : '1',
-    }
 }
 
 # max pin package is 128

@@ -22,12 +22,8 @@ class AP_Logger_File : public AP_Logger_Backend
 public:
     // constructor
     AP_Logger_File(AP_Logger &front,
-                   LoggerMessageWriter_DFLogStart *);
-
-    static AP_Logger_Backend  *probe(AP_Logger &front,
-                                     LoggerMessageWriter_DFLogStart *ls) {
-        return new AP_Logger_File(front, ls);
-    }
+                   LoggerMessageWriter_DFLogStart *,
+                   const char *log_directory);
 
     // initialisation
     void Init() override;
@@ -99,8 +95,6 @@ private:
 
     bool file_exists(const char *filename) const;
     bool log_exists(const uint16_t lognum) const;
-
-    bool dirent_to_log_num(const dirent *de, uint16_t &log_num) const;
 
     // write buffer
     ByteBuffer _writebuf{0};

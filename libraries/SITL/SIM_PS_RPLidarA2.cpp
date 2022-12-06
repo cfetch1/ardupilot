@@ -18,8 +18,6 @@
 
 #include "SIM_PS_RPLidarA2.h"
 
-#if HAL_SIM_PS_RPLIDARA2_ENABLED
-
 #include <GCS_MAVLink/GCS.h>
 #include <stdio.h>
 #include <errno.h>
@@ -231,5 +229,3 @@ void PS_RPLidarA2::send_response_descriptor(uint32_t data_response_length, SendM
         abort();
     }
 }
-
-#endif  // HAL_SIM_PS_RPLIDARA2_ENABLED

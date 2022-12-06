@@ -3,7 +3,6 @@
 #include "AP_NavEKF3.h"
 #include "AP_NavEKF3_core.h"
 #include <AP_DAL/AP_DAL.h>
-#include <GCS_MAVLink/GCS.h>
 
 // Check basic filter health metrics and return a consolidated health status
 bool NavEKF3_core::healthy(void) const
@@ -191,19 +190,6 @@ bool NavEKF3_core::getAirSpdVec(Vector3f &vel) const
     return true;
 }
 
-// return the innovation in m/s, innovation variance in (m/s)^2 and age in msec of the last TAS measurement processed
-// returns false if the data is unavailable
-bool NavEKF3_core::getAirSpdHealthData(float &innovation, float &innovationVariance, uint32_t &age_ms) const
-{
-    if (tasDataDelayed.time_ms == 0) {
-        // no data has been processed since startup
-        return false;
-    }
-    innovation = (float)innovVtas;
-    innovationVariance = (float)varInnovVtas;
-    age_ms = imuSampleTime_ms - tasDataDelayed.time_ms;
-    return true;
-}
 
 // Return the rate of change of vertical position in the down direction (dPosD/dt) of the body frame origin in m/s
 float NavEKF3_core::getPosDownDerivative(void) const
@@ -233,13 +219,11 @@ bool NavEKF3_core::getPosNE(Vector2f &posNE) const
                 const struct Location &gpsloc = gps.location(selected_gps);
                 posNE = public_origin.get_distance_NE_ftype(gpsloc).tofloat();
                 return false;
-#if EK3_FEATURE_BEACON_FUSION
             } else if (rngBcnAlignmentStarted) {
                 // If we are attempting alignment using range beacon data, then report the position
                 posNE.x = receiverPos.x;
                 posNE.y = receiverPos.y;
                 return false;
-#endif
             } else {
                 // If no GPS fix is available, all we can do is provide the last known position
                 posNE = outputDataNew.position.xy().tofloat();
@@ -254,9 +238,9 @@ bool NavEKF3_core::getPosNE(Vector2f &posNE) const
     return false;
 }
 
-// Write the last calculated D position of the body frame origin relative to the EKF local origin
+// Write the last calculated D position of the body frame origin relative to the EKF origin (m).
 // Return true if the estimate is valid
-bool NavEKF3_core::getPosD_local(float &posD) const
+bool NavEKF3_core::getPosD(float &posD) const
 {
     // The EKF always has a height estimate regardless of mode of operation
     // Correct for the IMU offset (EKF calculations are at the IMU)
@@ -273,21 +257,6 @@ bool NavEKF3_core::getPosD_local(float &posD) const
     // Return the current height solution status
     return filterStatus.flags.vert_pos;
 
-}
-
-// Write the last calculated D position of the body frame origin relative to the public origin
-// Return true if the estimate is valid
-bool NavEKF3_core::getPosD(float &posD) const
-{
-    bool ret = getPosD_local(posD);
-
-    // adjust posD for difference between our origin and the public_origin
-    Location local_origin;
-    if (getOriginLLH(local_origin)) {
-        posD += (public_origin.alt - local_origin.alt) * 0.01;
-    }
-
-    return ret;
 }
 
 // return the estimated height of body frame origin above ground level
@@ -307,9 +276,11 @@ bool NavEKF3_core::getLLH(struct Location &loc) const
     Location origin;
     if (getOriginLLH(origin)) {
         float posD;
-        if (getPosD_local(posD) && PV_AidingMode != AID_NONE) {
+        if(getPosD(posD) && PV_AidingMode != AID_NONE) {
             // Altitude returned is an absolute altitude relative to the WGS-84 spherioid
-            loc.set_alt_cm(origin.alt - posD*100.0, Location::AltFrame::ABSOLUTE);
+            loc.alt = origin.alt - posD*100;
+            loc.relative_alt = 0;
+            loc.terrain_alt = 0;
             if (filterStatus.flags.horiz_pos_abs || filterStatus.flags.horiz_pos_rel) {
                 // The EKF is able to provide a position estimate
                 loc.lat = EKF_origin.lat;
@@ -339,7 +310,6 @@ bool NavEKF3_core::getLLH(struct Location &loc) const
                 loc.lng = EKF_origin.lng;
                 loc.offset(lastKnownPositionNE.x + posOffsetNED.x,
                            lastKnownPositionNE.y + posOffsetNED.y);
-                loc.alt = EKF_origin.alt - lastKnownPositionD*100.0;
                 return false;
             }
         }
@@ -410,11 +380,9 @@ void NavEKF3_core::getMagXYZ(Vector3f &magXYZ) const
 // return true if offsets are valid
 bool NavEKF3_core::getMagOffsets(uint8_t mag_idx, Vector3f &magOffsets) const
 {
-    const auto &compass = dal.compass();
-    if (!compass.available()) {
+    if (!dal.get_compass()) {
         return false;
     }
-
     // compass offsets are valid if we have finalised magnetic field initialisation, magnetic field learning is not prohibited,
     // primary compass is valid and state variances have converged
     const float maxMagVar = 5E-6f;
@@ -422,12 +390,12 @@ bool NavEKF3_core::getMagOffsets(uint8_t mag_idx, Vector3f &magOffsets) const
     if ((mag_idx == magSelectIndex) &&
             finalInflightMagInit &&
             !inhibitMagStates &&
-            compass.healthy(magSelectIndex) &&
+            dal.get_compass()->healthy(magSelectIndex) &&
             variancesConverged) {
-        magOffsets = compass.get_offsets(magSelectIndex) - stateStruct.body_magfield.tofloat()*1000.0;
+        magOffsets = dal.get_compass()->get_offsets(magSelectIndex) - stateStruct.body_magfield.tofloat()*1000.0;
         return true;
     } else {
-        magOffsets = compass.get_offsets(magSelectIndex);
+        magOffsets = dal.get_compass()->get_offsets(magSelectIndex);
         return false;
     }
 }
@@ -491,7 +459,7 @@ bool NavEKF3_core::getVelInnovationsAndVariancesForSource(AP_NavEKF_Source::Sour
     switch (source) {
     case AP_NavEKF_Source::SourceXY::GPS:
         // check for timeouts
-        if (dal.millis() - gpsVelInnovTime_ms > 500) {
+        if (AP_HAL::millis() - gpsVelInnovTime_ms > 500) {
             return false;
         }
         innovations = gpsVelInnov.tofloat();
@@ -500,25 +468,13 @@ bool NavEKF3_core::getVelInnovationsAndVariancesForSource(AP_NavEKF_Source::Sour
 #if EK3_FEATURE_EXTERNAL_NAV
     case AP_NavEKF_Source::SourceXY::EXTNAV:
         // check for timeouts
-        if (dal.millis() - extNavVelInnovTime_ms > 500) {
+        if (AP_HAL::millis() - extNavVelInnovTime_ms > 500) {
             return false;
         }
         innovations = extNavVelInnov.tofloat();
         variances = extNavVelVarInnov.tofloat();
         return true;
 #endif // EK3_FEATURE_EXTERNAL_NAV
-    case AP_NavEKF_Source::SourceXY::OPTFLOW:
-        // check for timeouts
-        if (dal.millis() - flowInnovTime_ms > 500) {
-            return false;
-        }
-        innovations.x = flowInnov[0];
-        innovations.y = flowInnov[1];
-        innovations.z = 0;
-        variances.x = flowVarInnov[0];
-        variances.y = flowVarInnov[1];
-        variances.z = 0;
-        return true;
     default:
         // variances are not available for this source
         return false;
@@ -557,9 +513,8 @@ void  NavEKF3_core::getFilterStatus(nav_filter_status &status) const
     status = filterStatus;
 }
 
-#if HAL_GCS_ENABLED
 // send an EKF_STATUS message to GCS
-void NavEKF3_core::send_status_report(GCS_MAVLINK &link) const
+void NavEKF3_core::send_status_report(mavlink_channel_t chan) const
 {
     // prepare flags
     uint16_t flags = 0;
@@ -606,29 +561,20 @@ void NavEKF3_core::send_status_report(GCS_MAVLINK &link) const
     Vector2f offset;
     getVariances(velVar, posVar, hgtVar, magVar, tasVar, offset);
 
-
     // Only report range finder normalised innovation levels if the EKF needs the data for primary
     // height estimation or optical flow operation. This prevents false alarms at the GCS if a
     // range finder is fitted for other applications
-    float temp = 0;
+    float temp;
     if (((frontend->_useRngSwHgt > 0) && activeHgtSource == AP_NavEKF_Source::SourceZ::RANGEFINDER) || (PV_AidingMode == AID_RELATIVE && flowDataValid)) {
         temp = sqrtF(auxRngTestRatio);
+    } else {
+        temp = 0.0f;
     }
-
-    const mavlink_ekf_status_report_t packet{
-        velVar,
-        posVar,
-        hgtVar,
-        fmaxF(fmaxF(magVar.x,magVar.y),magVar.z),
-        temp,
-        flags,
-        tasVar
-    };
+    const float mag_max = fmaxF(fmaxF(magVar.x,magVar.y),magVar.z);
 
     // send message
-    mavlink_msg_ekf_status_report_send_struct(link.get_chan(), &packet);
+    mavlink_msg_ekf_status_report_send(chan, flags, velVar, posVar, hgtVar, mag_max, temp, tasVar);
 }
-#endif  // HAL_GCS_ENABLED
 
 // report the reason for why the backend is refusing to initialise
 const char *NavEKF3_core::prearm_failure_reason(void) const

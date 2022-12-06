@@ -18,24 +18,21 @@
 
 #pragma once
 
-#if AP_SIM_ENABLED
-
 #include <AP_Math/AP_Math.h>
 
 #include "SITL.h"
 #include "SITL_Input.h"
+#include <AP_Terrain/AP_Terrain.h>
 #include "SIM_Sprayer.h"
 #include "SIM_Gripper_Servo.h"
 #include "SIM_Gripper_EPM.h"
 #include "SIM_Parachute.h"
 #include "SIM_Precland.h"
 #include "SIM_RichenPower.h"
-#include "SIM_FETtecOneWireESC.h"
 #include "SIM_I2C.h"
 #include "SIM_Buzzer.h"
 #include "SIM_Battery.h"
 #include <Filter/Filter.h>
-#include "SIM_JSON_Master.h"
 
 namespace SITL {
 
@@ -91,6 +88,16 @@ public:
     // get frame rate of model in Hz
     float get_rate_hz(void) const { return rate_hz; }
 
+    // get number of motors for model
+    uint16_t get_num_motors() const {
+        return num_motors;
+    }
+
+    // get motor offset for model
+    virtual uint16_t get_motors_offset() const {
+        return 0;
+    }
+
     const Vector3f &get_gyro(void) const {
         return gyro;
     }
@@ -137,7 +144,6 @@ public:
     void set_sprayer(Sprayer *_sprayer) { sprayer = _sprayer; }
     void set_parachute(Parachute *_parachute) { parachute = _parachute; }
     void set_richenpower(RichenPower *_richenpower) { richenpower = _richenpower; }
-    void set_fetteconewireesc(FETtecOneWireESC *_fetteconewireesc) { fetteconewireesc = _fetteconewireesc; }
     void set_ie24(IntelligentEnergy24 *_ie24) { ie24 = _ie24; }
     void set_gripper_servo(Gripper_Servo *_gripper) { gripper = _gripper; }
     void set_gripper_epm(Gripper_EPM *_gripper_epm) { gripper_epm = _gripper_epm; }
@@ -147,7 +153,7 @@ public:
     float get_battery_voltage() const { return battery_voltage; }
 
 protected:
-    SIM *sitl;
+    SITL *sitl;
     // origin of position vector
     Location origin;
     // home location
@@ -179,13 +185,12 @@ protected:
     // battery model
     Battery battery;
 
-    uint32_t motor_mask;
-    float rpm[32];
+    uint8_t num_motors = 1;
+    uint8_t vtol_motor_start;
+    float rpm[12];
     uint8_t rcin_chan_count;
     float rcin[12];
-
-    virtual float rangefinder_beam_width() const { return 0; }
-    virtual float perpendicular_distance_to_rangefinder_surface() const;
+    float range = -1.0f;                 // externally supplied rangefinder value, assumed to have been corrected for vehicle attitude
 
     struct {
         // data from simulated laser scanner, if available
@@ -194,7 +199,7 @@ protected:
     } scanner;
 
     // Rangefinder
-    float rangefinder_m[SITL_NUM_RANGEFINDERS];
+    float rangefinder_m[RANGEFINDER_MAX_INSTANCES];
 
     // Windvane apparent wind
     struct {
@@ -243,6 +248,7 @@ protected:
 
     bool use_smoothing;
 
+    AP_Terrain *terrain;
     float ground_height_difference() const;
 
     virtual bool on_ground() const;
@@ -326,13 +332,9 @@ private:
     Gripper_EPM *gripper_epm;
     Parachute *parachute;
     RichenPower *richenpower;
-    FETtecOneWireESC *fetteconewireesc;
-
     IntelligentEnergy24 *ie24;
     SIM_Precland *precland;
     class I2C *i2c;
 };
 
 } // namespace SITL
-
-#endif // AP_SIM_ENABLED

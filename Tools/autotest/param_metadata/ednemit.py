@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
  Emits parameters as an EDN file, does some small remapping of names
 """

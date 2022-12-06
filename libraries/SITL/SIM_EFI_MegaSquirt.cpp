@@ -37,7 +37,13 @@ static uint32_t CRC32_MS(const uint8_t *buf, uint32_t len)
 void EFI_MegaSquirt::update()
 {
     auto sitl = AP::sitl();
-    if (!sitl || sitl->efi_type == SIM::EFI_TYPE_NONE) {
+    if (!sitl || sitl->efi_type == SITL::EFI_TYPE_NONE) {
+        return;
+    }
+    if (!connected) {
+        connected = sock.connect("127.0.0.1", 5763);
+    }
+    if (!connected) {
         return;
     }
     float rpm = sitl->state.rpm[0];
@@ -53,9 +59,13 @@ void EFI_MegaSquirt::update()
     table7.ct_cF = 3940;
     table7.afr_target1 = 148;
 
+    if (!sock.pollin(0)) {
+        return;
+    }
+
     // receive command
     while (ofs < sizeof(r_command)) {
-        if (read_from_autopilot((char*)&buf[ofs], 1) != 1) {
+        if (sock.recv(&buf[ofs], 1, 0) != 1) {
             break;
         }
         switch (ofs) {
@@ -131,8 +141,8 @@ void EFI_MegaSquirt::send_table(void)
     outbuf[0] = 0;
     swab(table_offset+(const uint8_t *)&table7, &outbuf[1], table_size);
 
-    write_to_autopilot((const char*)&len, sizeof(len));
-    write_to_autopilot((const char*)outbuf, sizeof(outbuf));
+    sock.send(&len, sizeof(len));
+    sock.send(outbuf, sizeof(outbuf));
     uint32_t crc = htobe32(CRC32_MS(outbuf, sizeof(outbuf)));
-    write_to_autopilot((const char *)&crc, sizeof(crc));
+    sock.send((const uint8_t *)&crc, sizeof(crc));
 }

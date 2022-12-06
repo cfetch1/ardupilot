@@ -40,9 +40,8 @@ public:
 
 private:
 
-    bool initialised, need_reset;
+    bool initialised;
     float b0, b1, b2, a1, a2, a0_inv;
-    float _center_freq_hz, _sample_freq_hz;
     T ntchsig, ntchsig1, ntchsig2, signal2, signal1;
 };
 
@@ -51,11 +50,13 @@ private:
  */
 class NotchFilterParams {
 public:
+    NotchFilterParams(void);
+    static const struct AP_Param::GroupInfo var_info[];
+
     float center_freq_hz(void) const { return _center_freq_hz; }
     float bandwidth_hz(void) const { return _bandwidth_hz; }
     float attenuation_dB(void) const { return _attenuation_dB; }
     uint8_t enabled(void) const { return _enable; }
-    void enable() { _enable.set(true); }
     
 protected:
     AP_Int8 _enable;
@@ -65,6 +66,5 @@ protected:
 };
 
 typedef NotchFilter<float> NotchFilterFloat;
-typedef NotchFilter<Vector2f> NotchFilterVector2f;
 typedef NotchFilter<Vector3f> NotchFilterVector3f;
 

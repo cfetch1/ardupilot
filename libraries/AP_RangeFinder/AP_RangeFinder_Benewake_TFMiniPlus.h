@@ -19,14 +19,6 @@
 #include "AP_RangeFinder.h"
 #include "AP_RangeFinder_Backend.h"
 
-#ifndef AP_RANGEFINDER_BENEWAKE_TFMINIPLUS_ENABLED
-#define AP_RANGEFINDER_BENEWAKE_TFMINIPLUS_ENABLED AP_RANGEFINDER_BACKEND_DEFAULT_ENABLED
-#endif
-
-#if AP_RANGEFINDER_BENEWAKE_TFMINIPLUS_ENABLED
-
-#define TFMINIPLUS_ADDR_DEFAULT              0x10        // TFMini default device id
-
 #include <AP_HAL/utility/sparse-endian.h>
 #include <AP_HAL/I2CDevice.h>
 
@@ -68,5 +60,3 @@ private:
         uint32_t count;
     } accum;
 };
-
-#endif

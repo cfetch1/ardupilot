@@ -29,13 +29,12 @@ void SITL_State::init(int argc, char * const argv[]) {
     const struct GetOptLong::option options[] = {
         {"help",            false,  0, 'h'},
         {"instance",        true,   0, 'I'},
-        {"maintenance",     false,  0, 'M'},
     };
 
     setvbuf(stdout, (char *)0, _IONBF, 0);
     setvbuf(stderr, (char *)0, _IONBF, 0);
 
-    GetOptLong gopt(argc, argv, "hI:M",
+    GetOptLong gopt(argc, argv, "hI:",
                     options);
 
     while((opt = gopt.getoption()) != -1) {
@@ -43,19 +42,13 @@ void SITL_State::init(int argc, char * const argv[]) {
             case 'I':
                 _instance = atoi(gopt.optarg);
                 break;
-            case 'M':
-                printf("Running in Maintenance Mode\n");
-                _maintenance = true;
-                break;
             default:
                 printf("Options:\n"
                     "\t--help|-h                display this help information\n"
-                    "\t--instance|-I N          set instance of SITL Periph\n"
-                    "\t--maintenance|-M         run in maintenance mode\n");
+                    "\t--instance|-I N          set instance of SITL Periph\n");
                 exit(1);
         }
     }
-
     printf("Running Instance: %d\n", _instance);
 }
 
@@ -65,10 +58,18 @@ void SITL_State::wait_clock(uint64_t wait_time_usec) {
     }
 }
 
-// when Periph can use SITL simulated devices we should remove these
-// stubs:
-ssize_t SITL::SerialDevice::read_from_device(char*, unsigned int) const { return -1; }
 
-ssize_t SITL::SerialDevice::write_to_device(char const*, unsigned int) const { return -1; }
+int SITL_State::gps_pipe(uint8_t index) {
+    return 0;
+}
+
+int SITL_State::sim_fd(const char *name, const char *arg) {
+    return 0;
+}
+
+int SITL_State::sim_fd_write(const char *name) {
+    return 0;
+}
+
 
 #endif //CONFIG_HAL_BOARD == HAL_BOARD_SITL && defined(HAL_BUILD_AP_PERIPH)

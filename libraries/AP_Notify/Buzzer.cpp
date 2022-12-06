@@ -21,18 +21,32 @@
 
 #include "AP_Notify.h"
 
+#ifndef HAL_BUZZER_ON
+  #if !defined(HAL_BUZZER_PIN)
+    #define HAL_BUZZER_ON (pNotify->get_buzz_level())
+    #define HAL_BUZZER_OFF (!pNotify->get_buzz_level())
+  #else
+    #define HAL_BUZZER_ON 1
+    #define HAL_BUZZER_OFF 0 
+  #endif
+#endif
+
+
+
 extern const AP_HAL::HAL& hal;
+
 
 bool Buzzer::init()
 {
     if (pNotify->buzzer_enabled() == false) {
         return false;
     }
+#if defined(HAL_BUZZER_PIN)
+    _pin = HAL_BUZZER_PIN;
+#else
     _pin = pNotify->get_buzz_pin();
-    if (_pin <= 0) {
-        // no buzzer
-        return false;
-    }
+#endif
+    if(!_pin) return false;
 
     // setup the pin and ensure it's off
     hal.gpio->pinMode(_pin, HAL_GPIO_OUTPUT);
@@ -133,8 +147,7 @@ void Buzzer::on(bool turn_on)
     _flags.on = turn_on;
 
     // pull pin high or low
-    const uint8_t buzz_on = pNotify->get_buzz_level();
-    hal.gpio->write(_pin, _flags.on? buzz_on : !buzz_on);
+    hal.gpio->write(_pin, _flags.on? HAL_BUZZER_ON : HAL_BUZZER_OFF);
 }
 
 /// play_pattern - plays the defined buzzer pattern

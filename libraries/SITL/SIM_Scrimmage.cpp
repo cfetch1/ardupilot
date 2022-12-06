@@ -18,8 +18,6 @@
 
 #include "SIM_Scrimmage.h"
 
-#if HAL_SIM_SCRIMMAGE_ENABLED
-
 #include <stdio.h>
 #include <inttypes.h>
 #include <sys/stat.h>
@@ -35,7 +33,8 @@ Scrimmage::Scrimmage(const char *_frame_str) :
     Aircraft(_frame_str),
     prev_timestamp_us(0),
     recv_sock(true),
-    send_sock(true)
+    send_sock(true),
+    frame_str(_frame_str)
 {
 }
 
@@ -131,5 +130,3 @@ void Scrimmage::update(const struct sitl_input &input)
 }
 
 } // namespace SITL
-
-#endif

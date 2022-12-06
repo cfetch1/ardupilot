@@ -4,7 +4,7 @@
 
 #include <AP_Gripper/AP_Gripper.h>
 
-#if AP_SCRIPTING_ENABLED
+#ifdef ENABLE_SCRIPTING
 #include <AP_Scripting/AP_Scripting.h>
 #endif
 
@@ -87,7 +87,7 @@ public:
         k_param_pos_control, // Position Control
         k_param_wp_nav, // Waypoint navigation
         k_param_mission, // Mission library
-        k_param_fence_old, // only used for conversion
+        k_param_fence, // Fence Library
         k_param_terrain, // Terrain database
         k_param_rally, // Disabled
         k_param_circle_nav, // Disabled
@@ -320,7 +320,7 @@ public:
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
 
-#if AP_GRIPPER_ENABLED
+#if GRIPPER_ENABLED
     AP_Gripper gripper;
 #endif
 
@@ -335,9 +335,13 @@ public:
     // control over servo output ranges
     SRV_Channels servo_channels;
 
-#if AP_SCRIPTING_ENABLED
+#ifdef ENABLE_SCRIPTING
     AP_Scripting scripting;
-#endif // AP_SCRIPTING_ENABLED
+#endif // ENABLE_SCRIPTING
+
+    // Airspeed
+    AP_Airspeed airspeed;
+
 };
 
 extern const AP_Param::Info        var_info[];

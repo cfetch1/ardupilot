@@ -2,14 +2,9 @@
 /// @brief	Photo or video camera manager, with EEPROM-backed storage of constants.
 #pragma once
 
-#include "AP_Camera_config.h"
-
-#if AP_CAMERA_ENABLED
-
-#include <AP_Common/Location.h>
-#include <AP_Logger/LogStructure.h>
 #include <AP_Param/AP_Param.h>
-#include <GCS_MAVLink/GCS_MAVLink.h>
+#include <GCS_MAVLink/GCS.h>
+#include <AP_Logger/AP_Logger.h>
 
 #define AP_CAMERA_TRIGGER_DEFAULT_DURATION  10      // default duration servo or relay is held open in 10ths of a second (i.e. 10 = 1 second)
 
@@ -23,15 +18,17 @@
 class AP_Camera {
 
 public:
-    AP_Camera(uint32_t _log_camera_bit)
+    AP_Camera(uint32_t _log_camera_bit, const struct Location &_loc)
         : log_camera_bit(_log_camera_bit)
+        , current_loc(_loc)
     {
         AP_Param::setup_object_defaults(this, var_info);
         _singleton = this;
     }
 
     /* Do not allow copies */
-    CLASS_NO_COPY(AP_Camera);
+    AP_Camera(const AP_Camera &other) = delete;
+    AP_Camera &operator=(const AP_Camera&) = delete;
 
     // get singleton instance
     static AP_Camera *get_singleton()
@@ -60,21 +57,6 @@ public:
 
     void take_picture();
 
-    // start/stop recording video
-    // start_recording should be true to start recording, false to stop recording
-    bool record_video(bool start_recording);
-
-    // zoom in, out or hold
-    // zoom out = -1, hold = 0, zoom in = 1
-    bool set_zoom_step(int8_t zoom_step);
-
-    // focus in, out or hold
-    // focus in = -1, focus hold = 0, focus out = 1
-    bool set_manual_focus_step(int8_t focus_step);
-
-    // auto focus
-    bool set_auto_focus();
-
     // Update - to be called periodically @at least 50Hz
     void update();
 
@@ -95,7 +77,6 @@ public:
         servo   = 0,
         relay   = 1,
         gopro   = 2,
-        mount   = 3,
     };
 
     AP_Camera::CamTrigType get_trigger_type(void);
@@ -127,7 +108,6 @@ private:
     AP_Int16        _min_interval;      // Minimum time between shots required by camera
     AP_Int16        _max_roll;          // Maximum acceptable roll angle when trigging camera
     uint32_t        _last_photo_time;   // last time a photo was taken
-    bool            _trigger_pending;   // true when we have delayed take_picture
     struct Location _last_location;
     uint16_t        _image_index;       // number of pictures taken since boot
 
@@ -137,17 +117,7 @@ private:
 
     uint32_t        _camera_trigger_count;
     uint32_t        _camera_trigger_logged;
-    uint32_t        _feedback_trigger_timestamp_us;
-    struct {
-        uint64_t        timestamp_us;
-        Location        location; // place where most recent image was taken
-        int32_t         roll_sensor;
-        int32_t         pitch_sensor;
-        int32_t         yaw_sensor;
-        uint32_t        camera_trigger_logged;  // ID sequence number
-    } feedback;
-    void prep_mavlink_msg_camera_feedback(uint64_t timestamp_us);
-
+    uint32_t        _feedback_timestamp_us;
     bool            _timer_installed;
     bool            _isr_installed;
     uint8_t         _last_pin_state;
@@ -160,6 +130,7 @@ private:
     void Write_CameraInfo(enum LogMessages msg, uint64_t timestamp_us=0);
 
     uint32_t log_camera_bit;
+    const struct Location &current_loc;
 
     // update camera trigger - 50Hz
     void update_trigger();
@@ -182,5 +153,3 @@ private:
 namespace AP {
 AP_Camera *camera();
 };
-
-#endif

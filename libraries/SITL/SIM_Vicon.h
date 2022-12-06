@@ -60,8 +60,7 @@ private:
         VISION_POSITION_ESTIMATE    = (1 << 0),
         VISION_SPEED_ESTIMATE       = (1 << 1),
         VICON_POSITION_ESTIMATE     = (1 << 2),
-        VISION_POSITION_DELTA       = (1 << 3),
-        ODOMETRY                    = (1 << 4),
+        VISION_POSITION_DELTA       = (1 << 3)
     };
 
     // return true if the given message type should be sent

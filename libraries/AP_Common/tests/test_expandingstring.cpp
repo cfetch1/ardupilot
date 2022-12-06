@@ -1,6 +1,5 @@
 #include <AP_gtest.h>
 #include <AP_Common/ExpandingString.h>
-#include <AP_HAL/AP_HAL.h>
 
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 

@@ -18,8 +18,6 @@
 
 #include "SIM_Gimbal.h"
 
-#if HAL_SIM_GIMBAL_ENABLED
-
 #include <stdio.h>
 
 #include "SIM_Aircraft.h"
@@ -27,14 +25,6 @@
 #include <AP_InertialSensor/AP_InertialSensor.h>
 
 extern const AP_HAL::HAL& hal;
-
-#define GIMBAL_DEBUG 0
-
-#if GIMBAL_DEBUG
-#define debug(fmt, args...)  do { printf("GIMBAL: " fmt, ##args); } while(0)
-#else
-#define debug(fmt, args...)  do { } while(0)
-#endif
 
 namespace SITL {
 
@@ -295,7 +285,7 @@ void Gimbal::send_report(void)
                 case MAVLINK_MSG_ID_HEARTBEAT: {
                     mavlink_heartbeat_t pkt;
                     mavlink_msg_heartbeat_decode(&msg, &pkt);
-                    debug("got HB type=%u autopilot=%u base_mode=0x%x\n", pkt.type, pkt.autopilot, pkt.base_mode);
+                    printf("Gimbal: got HB type=%u autopilot=%u base_mode=0x%x\n", pkt.type, pkt.autopilot, pkt.base_mode);
                     if (!seen_heartbeat) {
                         seen_heartbeat = true;
                         vehicle_component_id = msg.compid;
@@ -344,7 +334,7 @@ void Gimbal::send_report(void)
                     break;
                 }
                 default:
-                    debug("got unexpected msg %u\n", msg.msgid);
+                    printf("Gimbal got unexpected msg %u\n", msg.msgid);
                     break;
                 }
             }
@@ -423,5 +413,3 @@ void Gimbal::send_report(void)
 }
 
 } // namespace SITL
-
-#endif  // HAL_SIM_GIMBAL_ENABLED

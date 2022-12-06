@@ -141,13 +141,13 @@ void AP_Proximity_LightWareSF45B::process_message()
 
         // if distance is from a new face then update distance, angle and boundary for previous face
         // get face from 3D boundary based on yaw angle to the object
-        const AP_Proximity_Boundary_3D::Face face = frontend.boundary.get_face(angle_deg);
+        const AP_Proximity_Boundary_3D::Face face = boundary.get_face(angle_deg);
         if (face != _face) {
             if (_face_distance_valid) {
-                frontend.boundary.set_face_attributes(_face, _face_yaw_deg, _face_distance, state.instance);
+                boundary.set_face_attributes(_face, _face_yaw_deg, _face_distance);
             } else {
                 // mark previous face invalid
-                frontend.boundary.reset_face(_face, state.instance);
+                boundary.reset_face(_face);
             }
             // record updated face
             _face = face;

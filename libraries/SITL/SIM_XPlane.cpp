@@ -18,8 +18,6 @@
 
 #include "SIM_XPlane.h"
 
-#if HAL_SIM_XPLANE_ENABLED
-
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -28,7 +26,7 @@
 #include <sys/types.h>
 
 #include <AP_HAL/AP_HAL.h>
-#include <SRV_Channel/SRV_Channel.h>
+#include <AP_Logger/AP_Logger.h>
 
 // ignore cast errors in this case to keep complexity down
 #pragma GCC diagnostic ignored "-Wcast-align"
@@ -47,6 +45,7 @@ XPlane::XPlane(const char *frame_str) :
     }
 
     heli_frame = (strstr(frame_str, "-heli") != nullptr);
+    num_motors = 2;
 
     socket_in.bind("0.0.0.0", bind_port);
     printf("Waiting for XPlane data on UDP port %u and sending to port %u\n",
@@ -489,5 +488,3 @@ void XPlane::update(const struct sitl_input &input)
 }
 
 } // namespace SITL
-
-#endif  // HAL_SIM_XPLANE_ENABLED

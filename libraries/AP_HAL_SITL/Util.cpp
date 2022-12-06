@@ -72,7 +72,7 @@ bool HALSITL::Util::get_system_id_unformatted(uint8_t buf[], uint8_t &len)
   as get_system_id_unformatted will already be ascii, we use the same
   ID here
  */
-bool HALSITL::Util::get_system_id(char buf[50])
+bool HALSITL::Util::get_system_id(char buf[40])
 {
     uint8_t len = 40;
     return get_system_id_unformatted((uint8_t *)buf, len);
@@ -138,7 +138,7 @@ void *HALSITL::Util::heap_realloc(void *heap_ptr, void *ptr, size_t new_size)
 #if !defined(HAL_BUILD_AP_PERIPH)
 enum AP_HAL::Util::safety_state HALSITL::Util::safety_switch_state(void)
 {
-    const SITL::SIM *sitl = AP::sitl();
+    const SITL::SITL *sitl = AP::sitl();
     if (sitl == nullptr) {
         return AP_HAL::Util::SAFETY_NONE;
     }
@@ -162,20 +162,3 @@ void HALSITL::Util::commandline_arguments(uint8_t &argc, char * const *&argv)
     argv = saved_argv;
 }
 
-/**
- * This method will read random values with set size.
- */
-bool HALSITL::Util::get_random_vals(uint8_t* data, size_t size)
-{
-    int dev_random = open("/dev/urandom", O_RDONLY);
-    if (dev_random < 0) {
-        return false;
-    }
-    ssize_t result = read(dev_random, data, size);
-    if (result < 0) {
-        close(dev_random);
-        return false;
-    }
-    close(dev_random);
-    return true;
-}

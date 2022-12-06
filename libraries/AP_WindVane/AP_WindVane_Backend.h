@@ -16,6 +16,9 @@
 
 #include "AP_WindVane.h"
 
+#include <GCS_MAVLink/GCS.h>
+#include <Filter/Filter.h>
+
 class AP_WindVane_Backend
 {
 public:

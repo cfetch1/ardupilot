@@ -13,8 +13,6 @@
 
 #include "DiscreteRGBLed.h"
 
-#include <AP_HAL/HAL.h>
-
 extern const AP_HAL::HAL& hal;
 
 DiscreteRGBLed::DiscreteRGBLed(uint16_t red, uint16_t green, uint16_t blue, bool normal_polarity)

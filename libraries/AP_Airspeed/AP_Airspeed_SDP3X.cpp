@@ -19,9 +19,6 @@
   with thanks to https://github.com/PX4/Firmware/blob/master/src/drivers/sdp3x_airspeed
  */
 #include "AP_Airspeed_SDP3X.h"
-
-#if AP_AIRSPEED_SDP3X_ENABLED
-
 #include <GCS_MAVLink/GCS.h>
 #include <AP_Baro/AP_Baro.h>
 
@@ -118,7 +115,6 @@ bool AP_Airspeed_SDP3X::init()
 
         found = true;
 
-#if HAL_GCS_ENABLED
         char c = 'X';
         switch (_scale) {
         case SDP3X_SCALE_PRESSURE_SDP31:
@@ -131,10 +127,8 @@ bool AP_Airspeed_SDP3X::init()
             c = '3';
             break;
         }
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SDP3%c[%u]: Found bus %u addr 0x%02x scale=%u",
-                      get_instance(),
-                      c, get_bus(), addresses[i], _scale);
-#endif
+        hal.console->printf("SDP3%c: Found on bus %u address 0x%02x scale=%u\n",
+                            c, get_bus(), addresses[i], _scale);
     }
 
     if (!found) {
@@ -148,9 +142,6 @@ bool AP_Airspeed_SDP3X::init()
     set_skip_cal();
     set_offset(0);
     
-    _dev->set_device_type(uint8_t(DevType::SDP3X));
-    set_bus_id(_dev->get_bus_id());
-
     // drop to 2 retries for runtime
     _dev->set_retries(2);
 
@@ -226,25 +217,16 @@ float AP_Airspeed_SDP3X::_correct_pressure(float press)
 
     AP_Baro *baro = AP_Baro::get_singleton();
 
-    float baro_pressure;
-    if (baro == nullptr || baro->num_instances() == 0) {
-        // with no baro assume sea level
-        baro_pressure = SSL_AIR_PRESSURE;
-    } else {
-        baro_pressure = baro->get_pressure();
+    if (baro == nullptr) {
+        return press;
     }
 
     float temperature;
     if (!get_temperature(temperature)) {
-        // assume 25C if no temperature
-        temperature = 25;
-    }
-
-    float rho_air = baro_pressure / (ISA_GAS_CONSTANT * C_TO_KELVIN(temperature));
-    if (!is_positive(rho_air)) {
-        // bad pressure
         return press;
     }
+
+    float rho_air = baro->get_pressure() / (ISA_GAS_CONSTANT * (temperature + C_TO_KELVIN));
 
     /*
       the constants in the code below come from a calibrated test of
@@ -350,5 +332,3 @@ bool AP_Airspeed_SDP3X::_crc(const uint8_t data[], uint8_t size, uint8_t checksu
     // verify checksum
     return (crc_value == checksum);
 }
-
-#endif  // AP_AIRSPEED_SDP3X_ENABLED

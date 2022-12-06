@@ -2,20 +2,14 @@
 
 #include "AP_RangeFinder_Backend.h"
 
-#ifndef AP_RANGEFINDER_UAVCAN_ENABLED
-#define AP_RANGEFINDER_UAVCAN_ENABLED (HAL_CANMANAGER_ENABLED && AP_RANGEFINDER_BACKEND_DEFAULT_ENABLED)
-#endif
-
-#if AP_RANGEFINDER_UAVCAN_ENABLED
-
+#if HAL_CANMANAGER_ENABLED
 #include <AP_UAVCAN/AP_UAVCAN.h>
 
 class MeasurementCb;
 
 class AP_RangeFinder_UAVCAN : public AP_RangeFinder_Backend {
 public:
-    //constructor - registers instance at top RangeFinder driver
-    using AP_RangeFinder_Backend::AP_RangeFinder_Backend;
+    AP_RangeFinder_UAVCAN(RangeFinder::RangeFinder_State &_state, AP_RangeFinder_Params &_params);
 
     void update() override;
 
@@ -39,4 +33,4 @@ private:
     bool new_data;
     MAV_DISTANCE_SENSOR _sensor_type;
 };
-#endif  // AP_RANGEFINDER_UAVCAN_ENABLED
+#endif //HAL_CANMANAGER_ENABLED

@@ -18,8 +18,6 @@
 
 #include "SIM_AirSim.h"
 
-#if HAL_SIM_AIRSIM_ENABLED
-
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <errno.h>
@@ -334,7 +332,7 @@ void AirSim::recv_fdm(const sitl_input& input)
     }
 
     // Update Rangefinder data, max sensors limit as defined
-    uint8_t rng_sensor_count = MIN(state.rng.rng_distances.length, ARRAY_SIZE(rangefinder_m));
+    uint8_t rng_sensor_count = MIN(state.rng.rng_distances.length, RANGEFINDER_MAX_INSTANCES);
     for (uint8_t i=0; i<rng_sensor_count; i++) {
         rangefinder_m[i] = state.rng.rng_distances.data[i];
     }
@@ -350,7 +348,7 @@ void AirSim::recv_fdm(const sitl_input& input)
 // @Field: GX: Simulated gyroscope, X-axis
 // @Field: GY: Simulated gyroscope, Y-axis
 // @Field: GZ: Simulated gyroscope, Z-axis
-    AP::logger().WriteStreaming("ASM1", "TimeUS,TUS,R,P,Y,GX,GY,GZ",
+    AP::logger().Write("ASM1", "TimeUS,TUS,R,P,Y,GX,GY,GZ",
                        "QQffffff",
                        AP_HAL::micros64(),
                        state.timestamp,
@@ -377,7 +375,7 @@ void AirSim::recv_fdm(const sitl_input& input)
 // @Field: PZ: simulation's position, Z-axis
 // @Field: Alt: simulation's gps altitude
 // @Field: SD: simulation's earth-frame speed-down
-    AP::logger().WriteStreaming("ASM2", "TimeUS,AX,AY,AZ,VX,VY,VZ,PX,PY,PZ,Alt,SD",
+    AP::logger().Write("ASM2", "TimeUS,AX,AY,AZ,VX,VY,VZ,PX,PY,PZ,Alt,SD",
                        "Qfffffffffff",
                        AP_HAL::micros64(),
                        accel_body.x,
@@ -425,5 +423,3 @@ void AirSim::report_FPS(void)
         last_frame_count = state.timestamp;
     }
 }
-
-#endif  // HAL_SIM_AIRSIM_ENABLED

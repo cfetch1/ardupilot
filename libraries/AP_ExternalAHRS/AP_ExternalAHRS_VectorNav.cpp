@@ -29,7 +29,6 @@
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Common/NMEA.h>
 #include <stdio.h>
-#include <AP_BoardConfig/AP_BoardConfig.h>
 
 #if HAL_EXTERNAL_AHRS_ENABLED
 
@@ -121,7 +120,7 @@ AP_ExternalAHRS_VectorNav::AP_ExternalAHRS_VectorNav(AP_ExternalAHRS *_frontend,
     last_pkt2 = new VN_packet2;
 
     if (!pktbuf || !last_pkt1 || !last_pkt2) {
-        AP_BoardConfig::allocation_error("ExternalAHRS");
+        AP_HAL::panic("Failed to allocate ExternalAHRS");
     }
 
     if (!hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_ExternalAHRS_VectorNav::update_thread, void), "AHRS", 2048, AP_HAL::Scheduler::PRIORITY_SPI, 0)) {
@@ -244,8 +243,7 @@ void AP_ExternalAHRS_VectorNav::process_packet1(const uint8_t *b)
                                   Location::AltFrame::ABSOLUTE};
         state.have_location = true;
     }
-
-#if AP_BARO_EXTERNALAHRS_ENABLED
+    
     {
         AP_ExternalAHRS::baro_data_message_t baro;
         baro.instance = 0;
@@ -254,7 +252,6 @@ void AP_ExternalAHRS_VectorNav::process_packet1(const uint8_t *b)
 
         AP::baro().handle_external(baro);
     }
-#endif
 
     {
         AP_ExternalAHRS::mag_data_message_t mag;
@@ -293,7 +290,7 @@ void AP_ExternalAHRS_VectorNav::process_packet1(const uint8_t *b)
     // @Field: UP: uncertainty in pitch
     // @Field: UY: uncertainty in yaw
 
-    AP::logger().WriteStreaming("EAH1", "TimeUS,Roll,Pitch,Yaw,VN,VE,VD,Lat,Lon,Alt,UXY,UV,UR,UP,UY",
+    AP::logger().Write("EAH1", "TimeUS,Roll,Pitch,Yaw,VN,VE,VD,Lat,Lon,Alt,UXY,UV,UR,UP,UY",
                        "sdddnnnDUmmnddd", "F000000GG000000",
                        "QffffffLLffffff",
                        AP_HAL::micros64(),
@@ -417,7 +414,7 @@ void AP_ExternalAHRS_VectorNav::get_filter_status(nav_filter_status &status) con
 }
 
 // send an EKF_STATUS message to GCS
-void AP_ExternalAHRS_VectorNav::send_status_report(GCS_MAVLINK &link) const
+void AP_ExternalAHRS_VectorNav::send_status_report(mavlink_channel_t chan) const
 {
     if (!last_pkt1) {
         return;
@@ -466,7 +463,7 @@ void AP_ExternalAHRS_VectorNav::send_status_report(GCS_MAVLINK &link) const
     const float pos_gate = 5;
     const float hgt_gate = 5;
     const float mag_var = 0;
-    mavlink_msg_ekf_status_report_send(link.get_chan(), flags,
+    mavlink_msg_ekf_status_report_send(chan, flags,
                                        pkt1.velU/vel_gate, pkt1.posU/pos_gate, pkt1.posU/hgt_gate,
                                        mag_var, 0, 0);
 }

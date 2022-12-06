@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Emit docs in a form acceptable to the old Ardupilot wordpress docs site
 """

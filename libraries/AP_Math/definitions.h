@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#include <AP_HAL/AP_HAL_Boards.h>
+#include <AP_HAL/AP_HAL.h>
 
 #ifdef M_PI
 # undef M_PI
@@ -72,9 +72,7 @@ static const double WGS84_B = (WGS84_A * (1 - WGS84_F));
 static const double WGS84_E = (sqrt(2 * WGS84_F - WGS84_F * WGS84_F));
 #endif
 
-#define C_TO_KELVIN(temp) (temp + 273.15f)
-#define KELVIN_TO_C(temp) (temp - 273.15f)
-#define F_TO_KELVIN(temp) C_TO_KELVIN(((temp - 32) * 5/9))
+#define C_TO_KELVIN 273.15f
 
 #define M_PER_SEC_TO_KNOTS 1.94384449f
 #define KNOTS_TO_M_PER_SEC (1/M_PER_SEC_TO_KNOTS)
@@ -102,8 +100,6 @@ static const double WGS84_E = (sqrt(2 * WGS84_F - WGS84_F * WGS84_F));
 #define AP_USEC_PER_SEC   1000000ULL
 #define AP_USEC_PER_MSEC  1000ULL
 #define AP_MSEC_PER_SEC   1000ULL
-#define AP_SEC_PER_HOUR   (3600ULL)
-#define AP_MSEC_PER_HOUR  (AP_SEC_PER_HOUR * AP_MSEC_PER_SEC)
 #define AP_SEC_PER_WEEK   (7ULL * 86400ULL)
 #define AP_MSEC_PER_WEEK  (AP_SEC_PER_WEEK * AP_MSEC_PER_SEC)
 
@@ -114,9 +110,3 @@ static const double WGS84_E = (sqrt(2 * WGS84_F - WGS84_F * WGS84_F));
 // Convert amps milliseconds to milliamp hours
 // Amp.millisec to milliAmp.hour = 1/1E3(ms->s) * 1/3600(s->hr) * 1000(A->mA)
 #define AMS_TO_MAH 0.000277777778f
-
-// Amps microseconds to milliamp hours
-#define AUS_TO_MAH 0.0000002778f
-
-// kg/m^3 to g/cm^3
-#define KG_PER_M3_TO_G_PER_CM3(x) (0.001 * x)

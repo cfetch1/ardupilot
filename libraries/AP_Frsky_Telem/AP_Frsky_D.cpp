@@ -1,7 +1,5 @@
 #include "AP_Frsky_D.h"
 
-#if AP_FRSKY_D_TELEM_ENABLED
-
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_BattMonitor/AP_BattMonitor.h>
 #include <AP_GPS/AP_GPS.h>
@@ -51,9 +49,7 @@ void AP_Frsky_D::send(void)
         _D.last_200ms_frame = now;
         send_uint16(DATA_ID_TEMP2, (uint16_t)(AP::gps().num_sats() * 10 + AP::gps().status())); // send GPS status and number of satellites as num_sats*10 + status (to fit into a uint8_t)
         send_uint16(DATA_ID_TEMP1, gcs().custom_mode()); // send flight mode
-        uint8_t percentage = 0;
-        IGNORE_RETURN(_battery.capacity_remaining_pct(percentage));
-        send_uint16(DATA_ID_FUEL, (uint16_t)roundf(percentage)); // send battery remaining
+        send_uint16(DATA_ID_FUEL, (uint16_t)roundf(_battery.capacity_remaining_pct())); // send battery remaining
         send_uint16(DATA_ID_VFAS, (uint16_t)roundf(_battery.voltage() * 10.0f)); // send battery voltage
         float current;
         if (!_battery.current_amps(current)) {
@@ -84,5 +80,3 @@ void AP_Frsky_D::send(void)
         }
     }
 }
-
-#endif  // AP_FRSKY_D_TELEM_ENABLED
